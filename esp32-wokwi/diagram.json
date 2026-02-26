@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "author": "AirPort Project",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-devkit-c-v4",
+      "id": "esp",
+      "top": -9.6,
+      "left": -4.2,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-bme680",
+      "id": "bme",
+      "top": -73.15,
+      "left": 225.19,
+      "attrs": {}
+    }
+  ],
+  "connections": [
+    ["esp:3V3", "bme:VCC", "red", ["v0"]],
+    ["esp:GND.1", "bme:GND", "black", ["v0"]],
+    ["esp:22", "bme:SCL", "green", ["h0"]],
+    ["esp:21", "bme:SDA", "blue", ["h0"]]
+  ]
+}

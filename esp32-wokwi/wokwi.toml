@@ -1,0 +1,12 @@
+[wokwi]
+version = 1
+firmware = 'build/firmware.bin'
+elf = 'build/firmware.elf'
+
+[[dependencies]]
+name = 'adafruit/Adafruit BME680 Library'
+version = '*'
+
+[[dependencies]]
+name = 'bblanchon/ArduinoJson'
+version = '*'
