@@ -11,3 +11,8 @@ https://www.tldraw.com/f/1wUM6W3ITuRcHHfyeofKw?d=v-654.-256.3877.1908.page
 
 ## Imagem do Circuito
 <img width="700" height="400" alt="image" src="https://github.com/user-attachments/assets/2e2be2ad-f318-4911-83b6-f306e3d3bb18" />
+
+## Novos diretórios
+
+- `backend-fastapi/`: API FastAPI completa com integração InfluxDB.
+- `esp32-wokwi/`: Projeto ESP32 (Wokwi) para enviar dados do BME680 para a API.
