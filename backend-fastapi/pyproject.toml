@@ -1,0 +1,22 @@
+[project]
+name = "airport-fastapi-backend"
+version = "0.1.0"
+description = "Backend FastAPI para telemetria do projeto AirPort"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi==0.116.1",
+  "uvicorn[standard]==0.35.0",
+  "influxdb-client==1.49.0",
+  "pydantic-settings==2.10.1",
+  "python-dotenv==1.1.1",
+  "httpx==0.28.1",
+]
+
+[dependency-groups]
+dev = [
+  "pytest==8.4.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
