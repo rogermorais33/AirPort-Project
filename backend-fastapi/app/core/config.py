@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     influx_org: str = "airport-project"
     influx_bucket: str = "airport_telemetry"
     influx_retention_days: int = 30
+    ws_max_clients: int = 200
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False)
 

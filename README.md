@@ -16,3 +16,4 @@ https://www.tldraw.com/f/1wUM6W3ITuRcHHfyeofKw?d=v-654.-256.3877.1908.page
 
 - `backend-fastapi/`: API FastAPI completa com integração InfluxDB.
 - `esp32-wokwi/`: Projeto ESP32 (Wokwi) para enviar dados do BME680 para a API.
+- `frontend-nextjs/`: Dashboard Next.js (Tailwind + shadcn/ui) consumindo a API.

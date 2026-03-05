@@ -114,6 +114,64 @@ Notas para Podman:
 - `POST /api/v1/readings`
 - `GET /api/v1/readings/latest?device_id=esp32-001`
 - `GET /api/v1/readings?device_id=esp32-001&minutes=60&limit=200`
+- `WS /api/v1/ws/readings?device_id=esp32-001` (stream em tempo real)
+
+Exemplo de cliente WebSocket (JavaScript):
+
+```js
+const ws = new WebSocket("wss://SEU-HOST/api/v1/ws/readings?device_id=esp32-001");
+ws.onmessage = (event) => {
+  const payload = JSON.parse(event.data);
+  console.log(payload.type, payload.data);
+};
+```
+
+## Teste com websocat (Render-friendly)
+
+Instale o `websocat`:
+
+```bash
+# macOS (conforme docs da Render)
+brew install websocat
+
+# Linux/macOS com Rust
+cargo install websocat
+```
+
+Teste conexão WebSocket:
+
+```bash
+websocat "wss://SEU-HOST/api/v1/ws/readings?device_id=esp32-001"
+```
+
+No terminal do `websocat`, envie:
+
+```text
+ping
+```
+
+Você deve receber um payload `{"type":"pong",...}`.
+
+Em outro terminal, dispare uma leitura para verificar broadcast em tempo real:
+
+```bash
+curl -X POST "https://SEU-HOST/api/v1/readings" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "device_id":"esp32-001",
+    "temperature_c":24.5,
+    "humidity_pct":62.3,
+    "pressure_hpa":1009.2,
+    "gas_resistance_ohm":12400,
+    "voc_index":33.8,
+    "air_quality_score":77.5,
+    "is_urgent":false,
+    "is_heartbeat":false,
+    "metadata":{"source":"websocat-test"}
+  }'
+```
+
+O terminal do `websocat` deve receber `connected`, `latest_snapshot` (se existir) e `reading_ingested`.
 
 ## Exemplo de payload para ingestão
 
@@ -141,6 +199,7 @@ Notas para Podman:
 - Para acesso público do ESP32 em outra rede, exponha a API com `ngrok`.
 - Troque `INFLUX_TOKEN` por token forte.
 - Ajuste retenção (`INFLUX_RETENTION_DAYS`) conforme volume esperado.
+- Ajuste `WS_MAX_CLIENTS` no `.env` para limitar conexões simultâneas (proteção contra sobrecarga).
 
 
 
