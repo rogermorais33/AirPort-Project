@@ -10,7 +10,7 @@ const char* WIFI_PASS = "";
 const char* API_BASE_URL = "https://airport-project-10ho.onrender.com";
 const char* API_HOST = "airport-project-10ho.onrender.com";
 const uint16_t API_PORT = 443;
-const char* DEVICE_ID = "esp32-wokwi-api-test-001";
+const char* DEVICE_ID = "esp32-wokwi-001";
 const char* FIRMWARE_VERSION = "v1.1.0-test";
 
 const unsigned long TEST_CYCLE_INTERVAL_MS = 15000;

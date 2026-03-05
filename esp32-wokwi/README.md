@@ -1,64 +1,93 @@
 # ESP32 Wokwi - Integração com FastAPI
 
-Este diretório contém um projeto pronto para Wokwi usando ESP32 + BME680.
+Este diretório está preparado para simular no VS Code com Wokwi usando PlatformIO.
 
-## Arquivos
+## Arquivos principais
 
-- `sketch.ino`: firmware completo (BME680 + lógica edge + healthcheck + POST para API).
-- `sketch_teste_api.ino`: teste completo da API (diagnóstico + health + post + latest + list), sem sensor.
+- `platformio.ini`: configura build local do firmware.
+- `wokwi.toml`: aponta para o firmware compilado usado na simulação.
+- `src/main_api_test.cpp`: entrada de build para `sketch_teste_api.ino`.
+- `src/main_sensor.cpp`: entrada de build para `sketch.ino`.
 - `diagram.json`: circuito ESP32 + BME680 via I2C.
-- `libraries.txt`: bibliotecas necessárias no Wokwi.
+- `sketch_teste_api.ino`: teste de conectividade ponta a ponta com API (padrão).
+- `sketch.ino`: firmware com leitura do BME680 e lógica edge.
 
-## Como usar no Wokwi
+## Fluxo recomendado no VS Code
 
-1. Crie um projeto ESP32 no Wokwi.
-2. Copie os arquivos deste diretório para o projeto Wokwi.
-3. No `sketch.ino`, altere:
+1. Instale as extensões:
+   - `Wokwi Simulator`
+   - `PlatformIO IDE`
+2. Abra a pasta `esp32-wokwi` no VS Code.
+3. Compile o firmware padrão (teste de API):
 
-```cpp
-const char* API_BASE_URL = "https://SEU-ENDERECO-DA-API";
-const char* API_HOST = "SEU-ENDERECO-DA-API";
+```bash
+pio run -e esp32-api-test
 ```
 
-Exemplo para Render:
+Ou use a task do VS Code: `PIO: Build (API Test)`.
+
+4. Rode `Wokwi: Start Simulation`.
+
+Se o build concluir, os binários existirão em:
+
+- `.pio/build/esp32-api-test/firmware.bin`
+- `.pio/build/esp32-api-test/firmware.elf`
+
+e o erro `firmware binary ... not found` desaparece.
+
+## Teste de API (padrão)
+
+O sketch `sketch_teste_api.ino` já usa:
 
 ```cpp
 const char* API_BASE_URL = "https://airport-project-10ho.onrender.com";
 const char* API_HOST = "airport-project-10ho.onrender.com";
 ```
 
-4. Se estiver rodando local, exponha com ngrok:
+Na simulação, ele executa ciclos de:
+
+- Diagnóstico DNS/TCP/TLS
+- `GET /api/v1/health`
+- `POST /api/v1/readings`
+- `GET /api/v1/readings/latest`
+- `GET /api/v1/readings`
+
+## Como usar o firmware com sensor (`sketch.ino`)
+
+1. Compile outra env:
 
 ```bash
-ngrok http 8000
+pio run -e esp32-sensor
 ```
 
-5. Cole a URL HTTPS pública do ngrok nas constantes `API_BASE_URL` e `API_HOST`.
-6. Rode a simulação no Wokwi e acompanhe os envios no Serial Monitor.
+Ou use a task: `PIO: Build (Sensor)`.
 
-## Lógica Edge implementada
+2. Troque temporariamente os caminhos no `wokwi.toml` para:
 
-- Leitura periódica do BME680.
-- Se houver mudança relevante (delta) ou urgência, envia imediatamente.
-- Se estável, acumula em buffer e envia média no heartbeat.
-- Flag de urgência (`is_urgent`) quando VOC alto e umidade alta.
+```toml
+firmware = '.pio/build/esp32-sensor/firmware.bin'
+elf = '.pio/build/esp32-sensor/firmware.elf'
+```
 
-## Compatibilidade com backend
+3. Inicie a simulação novamente.
 
-Payload enviado é compatível com `POST /api/v1/readings` da pasta `backend-fastapi/`.
+## Troubleshooting
 
-## Teste completo sem sensor
+- `status: -1` no serial: falha de rede/DNS/TLS.
+- `4xx/5xx`: backend respondeu com erro; validar API online e configuração.
+- `firmware binary not found`: rode o `pio run` da env correta antes de iniciar o Wokwi.
 
-Para validar ponta a ponta ESP32 -> API:
+### Erro `Unknown development platform 'espressif32'`
 
-1. Abra `sketch_teste_api.ino` no Wokwi.
-2. Rode a simulacao.
-3. O sketch executa um ciclo automatico com:
-   - Diagnostico DNS/TCP/TLS
-   - `GET /api/v1/health`
-   - `POST /api/v1/readings`
-   - `GET /api/v1/readings/latest`
-   - `GET /api/v1/readings`
+Esse erro geralmente indica cache/instalação corrompida do PlatformIO Core. No terminal:
 
-Se vier `4xx/5xx`, confira URL do ngrok, API no ar e token/config do backend.
-Se vier `status: -1`, veja o texto `erro HTTPClient` no monitor serial (DNS/TLS/conexao).
+```bash
+pio system prune -f
+rm -rf ~/.platformio/platforms/espressif32 ~/.platformio/platforms/platform-espressif32
+rm -rf ~/.platformio/.cache
+pio pkg install -g -p "platformio/espressif32@~6.12.0"
+pio run -d esp32-wokwi -e esp32-api-test
+```
+
+Se estiver no Windows nativo (não WSL), o caminho equivalente é:
+`C:\Users\<seu-usuario>\.platformio\...`
