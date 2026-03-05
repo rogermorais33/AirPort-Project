@@ -1,164 +1,101 @@
 # Backend FastAPI - AirPort Project
 
-API para receber telemetria de qualidade do ar do ESP32/BME680, salvar no InfluxDB e disponibilizar consulta para dashboard/análise.
+API para receber telemetria de qualidade do ar do ESP32/BME680, salvar no InfluxDB e disponibilizar consulta REST + stream WebSocket para o dashboard.
+
+## Stack
+
+- Python 3.11+
+- FastAPI + Uvicorn
+- InfluxDB 2.x
+- `uv` para gerenciamento de dependências
+- `pytest` para testes
 
 ## Estrutura
 
-- `app/main.py`: inicialização da API.
-- `app/api/readings.py`: endpoints HTTP.
-- `app/models/sensor.py`: modelos de entrada e saída.
-- `app/services/influx.py`: integração com InfluxDB.
-- `pyproject.toml`: dependências e configuração do projeto.
-- `uv.lock`: lockfile do `uv`.
-- `docker-compose.yml`: sobe InfluxDB + API.
+- `app/main.py`: inicialização da aplicação.
+- `app/api/readings.py`: endpoints HTTP e WebSocket.
+- `app/models/sensor.py`: schemas Pydantic.
+- `app/services/influx.py`: escrita e leitura no InfluxDB.
+- `app/services/ws.py`: hub WebSocket para broadcast.
+- `tests/`: testes de healthcheck e websocket.
 
-## Pré-requisitos
+## Variáveis de ambiente
 
-- Python 3.11+
-- `uv` (gerenciador de dependências)
-- Docker Compose ou Podman Compose (opcional)
-
-Instalação do `uv` (Linux/macOS):
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-## Desenvolvimento local com uv (recomendado)
-
-1. Entre na pasta do backend:
-
-```bash
-cd backend-fastapi
-```
-
-2. Copie o arquivo de ambiente:
+Copie `.env.example` para `.env` e ajuste os valores:
 
 ```bash
 cp .env.example .env
 ```
 
-3. Instale/sincronize dependências:
+Principais variáveis:
+
+- `APP_NAME`: nome da API.
+- `APP_ENV`: ambiente (`dev`, `prod`, etc).
+- `APP_PORT`: porta da API (padrão `8000`).
+- `INFLUX_URL`: URL do InfluxDB.
+- `INFLUX_TOKEN`: token de autenticação do InfluxDB.
+- `INFLUX_ORG`: organização do InfluxDB.
+- `INFLUX_BUCKET`: bucket de telemetria.
+- `INFLUX_RETENTION_DAYS`: retenção (dias) para criação automática do bucket.
+- `WS_MAX_CLIENTS`: limite de conexões websocket simultâneas.
+
+## Execução local com uv (recomendado)
 
 ```bash
+cd backend-fastapi
+cp .env.example .env
 uv sync
-```
-
-4. Rode a API:
-
-```bash
 uv run uvicorn app.main:app --reload --port 8000
 ```
 
-5. Rode testes:
+API local: `http://localhost:8000`
+
+## Testes
 
 ```bash
+cd backend-fastapi
 uv run pytest
 ```
 
-## Gerenciar dependências com uv
-
-Adicionar dependência de runtime:
+## Execução com Docker Compose
 
 ```bash
-uv add nome-da-lib
-```
-
-Adicionar dependência de desenvolvimento:
-
-```bash
-uv add --dev nome-da-lib
-```
-
-Remover dependência:
-
-```bash
-uv remove nome-da-lib
-```
-
-Atualizar lockfile:
-
-```bash
-uv lock
-```
-
-Exportar `requirements.txt` (usado no build atual do container):
-
-```bash
-uv export --format requirements-txt --no-hashes --output-file requirements.txt
-```
-
-## Rodando com Compose
-
-1. Copie `.env.example` para `.env`.
-2. Suba os serviços:
-
-```bash
+cd backend-fastapi
+cp .env.example .env
 docker compose up --build
 ```
 
-Ou com Podman:
+Com Podman:
 
 ```bash
+cd backend-fastapi
+cp .env.example .env
 podman compose up --build
 ```
 
-Notas para Podman:
-
-- Você precisa ter `podman-compose` instalado.
-- As imagens no `docker-compose.yml` já estão com nome completo (`docker.io/...`) para evitar erro de short-name.
-
-## Endpoints principais
+## Endpoints
 
 - `GET /api/v1/health`
 - `POST /api/v1/readings`
-- `GET /api/v1/readings/latest?device_id=esp32-001`
-- `GET /api/v1/readings?device_id=esp32-001&minutes=60&limit=200`
-- `WS /api/v1/ws/readings?device_id=esp32-001` (stream em tempo real)
+- `GET /api/v1/readings/latest?device_id=esp32-wokwi-001`
+- `GET /api/v1/readings?device_id=esp32-wokwi-001&minutes=60&limit=200`
+- `WS /api/v1/ws/readings?device_id=esp32-wokwi-001`
 
-Exemplo de cliente WebSocket (JavaScript):
+Comportamentos importantes:
 
-```js
-const ws = new WebSocket("wss://SEU-HOST/api/v1/ws/readings?device_id=esp32-001");
-ws.onmessage = (event) => {
-  const payload = JSON.parse(event.data);
-  console.log(payload.type, payload.data);
-};
-```
+- Se o InfluxDB estiver indisponível, endpoints de leitura/escrita retornam `503`.
+- O websocket envia evento inicial `connected`.
+- Se houver `device_id` no websocket e já existir dado no banco, envia `latest_snapshot`.
+- Em cada ingestão, o websocket envia `reading_ingested` para clientes compatíveis com o filtro de `device_id`.
+- Se exceder `WS_MAX_CLIENTS`, a conexão recebe `overloaded` e fecha com código `1013`.
 
-## Teste com websocat (Render-friendly)
-
-Instale o `websocat`:
+## Exemplo de ingestão
 
 ```bash
-# macOS (conforme docs da Render)
-brew install websocat
-
-# Linux/macOS com Rust
-cargo install websocat
-```
-
-Teste conexão WebSocket:
-
-```bash
-websocat "wss://SEU-HOST/api/v1/ws/readings?device_id=esp32-001"
-```
-
-No terminal do `websocat`, envie:
-
-```text
-ping
-```
-
-Você deve receber um payload `{"type":"pong",...}`.
-
-Em outro terminal, dispare uma leitura para verificar broadcast em tempo real:
-
-```bash
-curl -X POST "https://SEU-HOST/api/v1/readings" \
+curl -X POST "http://localhost:8000/api/v1/readings" \
   -H "Content-Type: application/json" \
   -d '{
-    "device_id":"esp32-001",
+    "device_id":"esp32-wokwi-001",
     "temperature_c":24.5,
     "humidity_pct":62.3,
     "pressure_hpa":1009.2,
@@ -167,44 +104,35 @@ curl -X POST "https://SEU-HOST/api/v1/readings" \
     "air_quality_score":77.5,
     "is_urgent":false,
     "is_heartbeat":false,
-    "metadata":{"source":"websocat-test"}
+    "metadata":{"source":"manual-test"}
   }'
 ```
 
-O terminal do `websocat` deve receber `connected`, `latest_snapshot` (se existir) e `reading_ingested`.
+## Teste de websocket com websocat
 
-## Exemplo de payload para ingestão
-
-```json
-{
-  "device_id": "esp32-001",
-  "timestamp": "2026-02-25T20:10:00Z",
-  "temperature_c": 27.3,
-  "humidity_pct": 63.2,
-  "pressure_hpa": 1009.4,
-  "gas_resistance_ohm": 14500.0,
-  "voc_index": 35.4,
-  "air_quality_score": 71.2,
-  "is_urgent": false,
-  "is_heartbeat": false,
-  "metadata": {
-    "source": "wokwi",
-    "firmware": "v1.0.0"
-  }
-}
+```bash
+websocat "ws://localhost:8000/api/v1/ws/readings?device_id=esp32-wokwi-001"
 ```
 
-## Observações de produção
+No terminal do websocat, envie:
 
-- Para acesso público do ESP32 em outra rede, exponha a API com `ngrok`.
-- Troque `INFLUX_TOKEN` por token forte.
-- Ajuste retenção (`INFLUX_RETENTION_DAYS`) conforme volume esperado.
-- Ajuste `WS_MAX_CLIENTS` no `.env` para limitar conexões simultâneas (proteção contra sobrecarga).
+```text
+ping
+```
 
+A API deve responder com um evento `pong`.
 
+## Deploy (Render)
 
-podman compose down --remove-orphans
-podman compose up --build
+Para usar com o frontend no Render:
 
-podman pull docker.io/library/influxdb:2.7
-podman compose up --build
+1. Suba este serviço como Web Service.
+2. Defina variáveis (`INFLUX_*`, `WS_MAX_CLIENTS`, etc).
+3. Garanta que `INFLUX_URL` seja acessível pelo serviço.
+4. Use a URL pública no frontend como `BACKEND_API_BASE_URL`.
+
+## Troubleshooting
+
+- `503 InfluxDB indisponivel`: validar `INFLUX_URL`, `INFLUX_TOKEN`, conectividade e permissões.
+- `404 em /readings/latest`: ainda não há leitura para o `device_id` informado.
+- WebSocket fecha com `1013`: limite de `WS_MAX_CLIENTS` atingido.
