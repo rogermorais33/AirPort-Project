@@ -4,25 +4,25 @@
 
 @layer base {
   :root {
-    --background: 210 62% 6%;
-    --foreground: 208 100% 96%;
-    --card: 211 51% 11%;
-    --card-foreground: 208 100% 96%;
-    --popover: 211 56% 9%;
-    --popover-foreground: 207 95% 95%;
-    --primary: 164 69% 50%;
-    --primary-foreground: 160 69% 10%;
-    --secondary: 215 35% 18%;
-    --secondary-foreground: 207 95% 93%;
-    --muted: 214 28% 20%;
-    --muted-foreground: 208 33% 69%;
-    --accent: 37 100% 65%;
-    --accent-foreground: 31 83% 17%;
-    --destructive: 0 89% 67%;
+    --background: 240 10% 4%;
+    --foreground: 210 40% 98%;
+    --card: 240 8% 9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 240 8% 10%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 158 64% 48%;
+    --primary-foreground: 158 76% 9%;
+    --secondary: 240 6% 16%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 240 7% 14%;
+    --muted-foreground: 240 5% 68%;
+    --accent: 39 96% 60%;
+    --accent-foreground: 38 92% 12%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 213 32% 27%;
-    --input: 214 34% 22%;
-    --ring: 164 69% 50%;
+    --border: 240 6% 22%;
+    --input: 240 6% 14%;
+    --ring: 158 64% 48%;
     --radius: 1rem;
   }
 
@@ -36,31 +36,15 @@
   }
 
   body {
-    color: hsl(var(--foreground));
+    font-family: var(--font-body), ui-sans-serif;
     background:
-      radial-gradient(circle at 82% -10%, rgba(56, 189, 248, 0.22) 0%, transparent 38%),
-      radial-gradient(circle at -5% 80%, rgba(34, 197, 94, 0.18) 0%, transparent 36%),
-      linear-gradient(135deg, #030812 0%, #081523 48%, #06111a 100%);
+      radial-gradient(circle at 85% 8%, rgba(16, 185, 129, 0.15), transparent 30%),
+      radial-gradient(circle at 5% 82%, rgba(245, 158, 11, 0.12), transparent 30%),
+      linear-gradient(135deg, #050507 0%, #0c0d12 50%, #11111a 100%);
     background-attachment: fixed;
   }
-}
 
-@layer components {
-  .glass-panel {
-    @apply rounded-2xl border border-white/10 bg-slate-950/40 backdrop-blur-xl shadow-dashboard;
-  }
-
-  .section-title {
-    @apply font-display text-base font-semibold tracking-wide text-slate-50;
-  }
-
-  .eyebrow {
-    @apply text-[10px] font-semibold uppercase tracking-[0.26em] text-emerald-300;
-  }
-}
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+  .font-heading {
+    font-family: var(--font-heading), ui-sans-serif;
   }
 }

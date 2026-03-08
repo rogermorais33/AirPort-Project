@@ -11,9 +11,10 @@ function resolveBackendBaseUrl(): string {
   return envUrl.replace(/\/$/, "");
 }
 
-export async function GET(
+async function proxyRequest(
   request: Request,
   context: { params: { path: string[] } },
+  method: string,
 ) {
   const segments = context.params.path ?? [];
   if (segments.length === 0) {
@@ -21,27 +22,56 @@ export async function GET(
   }
 
   const incomingUrl = new URL(request.url);
-  const backendUrl = new URL(
-    `${resolveBackendBaseUrl()}/api/${segments.join("/")}`,
-  );
+  const backendUrl = new URL(`${resolveBackendBaseUrl()}/api/${segments.join("/")}`);
   backendUrl.search = incomingUrl.search;
 
-  const response = await fetch(backendUrl.toString(), {
-    method: "GET",
-    headers: {
-      Accept: request.headers.get("accept") ?? "application/json",
-    },
-    cache: "no-store",
-  });
+  const headers = new Headers(request.headers);
+  headers.delete("host");
+  headers.delete("connection");
+  headers.delete("content-length");
 
-  const headers = new Headers();
-  const contentType = response.headers.get("content-type");
-  if (contentType) {
-    headers.set("content-type", contentType);
+  const init: RequestInit = {
+    method,
+    headers,
+    cache: "no-store",
+  };
+
+  if (!["GET", "HEAD"].includes(method)) {
+    init.body = await request.arrayBuffer();
+  }
+
+  const response = await fetch(backendUrl.toString(), init);
+
+  const outputHeaders = new Headers();
+  for (const [key, value] of response.headers.entries()) {
+    if (key.toLowerCase() === "content-length") {
+      continue;
+    }
+    outputHeaders.set(key, value);
   }
 
   return new Response(response.body, {
     status: response.status,
-    headers,
+    headers: outputHeaders,
   });
+}
+
+export async function GET(request: Request, context: { params: { path: string[] } }) {
+  return proxyRequest(request, context, "GET");
+}
+
+export async function POST(request: Request, context: { params: { path: string[] } }) {
+  return proxyRequest(request, context, "POST");
+}
+
+export async function PUT(request: Request, context: { params: { path: string[] } }) {
+  return proxyRequest(request, context, "PUT");
+}
+
+export async function PATCH(request: Request, context: { params: { path: string[] } }) {
+  return proxyRequest(request, context, "PATCH");
+}
+
+export async function DELETE(request: Request, context: { params: { path: string[] } }) {
+  return proxyRequest(request, context, "DELETE");
 }
