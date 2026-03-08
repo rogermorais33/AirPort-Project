@@ -1,21 +1,28 @@
 [project]
-name = "airport-fastapi-backend"
-version = "0.1.0"
-description = "Backend FastAPI para telemetria do projeto AirPort"
+name = "gazepilot-fastapi-backend"
+version = "2.0.0"
+description = "GazePilot backend API (ESP32-CAM + gaze/head tracking + heatmap)"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi==0.116.1",
   "uvicorn[standard]==0.35.0",
-  "influxdb-client==1.49.0",
-  "pydantic-settings==2.10.1",
-  "python-dotenv==1.1.1",
+  "sqlalchemy==2.0.44",
+  "alembic==1.16.5",
+  "psycopg[binary]==3.2.12",
+  "pydantic-settings==2.11.0",
+  "python-dotenv==1.2.1",
+  "python-multipart==0.0.20",
+  "opencv-python-headless==4.12.0.88",
+  "mediapipe==0.10.14",
+  "numpy==2.2.6",
+  "redis==6.4.0",
   "httpx==0.28.1",
 ]
 
 [dependency-groups]
 dev = [
-  "pytest==8.4.1",
+  "pytest==8.4.2",
 ]
 
 [tool.pytest.ini_options]

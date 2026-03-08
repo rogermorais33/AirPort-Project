@@ -1,63 +1,61 @@
-# Backend FastAPI - AirPort Project
+# backend-fastapi (GazePilot)
 
-API para receber telemetria de qualidade do ar do ESP32/BME680, salvar no InfluxDB e disponibilizar consulta REST + stream WebSocket para o dashboard.
+API FastAPI do **GazePilot** para ingestão de frames JPEG do ESP32-CAM, extração de pose/cálculo de gaze, geração de comandos hands-free e relatórios (heatmap/timeline).
 
 ## Stack
 
 - Python 3.11+
 - FastAPI + Uvicorn
-- InfluxDB 2.x
-- `uv` para gerenciamento de dependências
-- `pytest` para testes
+- PostgreSQL + SQLAlchemy
+- Alembic (migrations)
+- OpenCV + MediaPipe Face Landmarker (pipeline CV robusto)
+- Redis opcional (modo produção com worker)
 
 ## Estrutura
 
-- `app/main.py`: inicialização da aplicação.
-- `app/api/readings.py`: endpoints HTTP e WebSocket.
-- `app/models/sensor.py`: schemas Pydantic.
-- `app/services/influx.py`: escrita e leitura no InfluxDB.
-- `app/services/ws.py`: hub WebSocket para broadcast.
-- `tests/`: testes de healthcheck e websocket.
+- `app/main.py`: inicialização da API + ciclo de vida.
+- `app/api/`: rotas REST e WebSocket.
+- `app/models/entities.py`: modelos relacionais (devices/sessions/pages/frames/...)
+- `app/services/`: pipeline CV, engine de comandos, queue e ws hub.
+- `models/`: artefatos de modelo local (ex.: `face_landmarker.task`).
+- `scripts/download_face_landmarker.py`: helper para baixar o modelo do MediaPipe.
+- `alembic/`: migrations.
+- `tests/`: health, sessions, ingest frame multipart e websocket.
 
-## Variáveis de ambiente
+## Endpoints principais
 
-Copie `.env.example` para `.env` e ajuste os valores:
+- `GET /api/v1/health`
+- `POST /api/v1/devices/register`
+- `POST /api/v1/devices/heartbeat`
+- `GET /api/v1/device-config/{device_id}`
+- `GET /api/v1/devices/config/{device_id}` (alias)
+- `POST /api/v1/sessions/start`
+- `GET /api/v1/sessions/active?device_id=...`
+- `POST /api/v1/sessions/{id}/end`
+- `POST /api/v1/sessions/{id}/page`
+- `GET /api/v1/sessions/{id}/pages`
+- `POST /api/v1/frames` (multipart: `file`, `device_key`, `session_id`, `ts`)
+- `POST /api/v1/calibration/profile`
+- `POST /api/v1/calibration/{profile_id}/point`
+- `POST /api/v1/calibration/{profile_id}/train`
+- `GET /api/v1/reports/session/{id}`
+- `GET /api/v1/reports/session/{id}/heatmap`
+- `GET /api/v1/reports/session/{id}/timeline`
+- `GET /api/v1/reports/session/{id}/commands`
+- `WS /api/v1/ws/live?session_id=...`
 
-```bash
-cp .env.example .env
-```
-
-Principais variáveis:
-
-- `APP_NAME`: nome da API.
-- `APP_ENV`: ambiente (`dev`, `prod`, etc).
-- `APP_PORT`: porta da API (padrão `8000`).
-- `INFLUX_URL`: URL do InfluxDB.
-- `INFLUX_TOKEN`: token de autenticação do InfluxDB.
-- `INFLUX_ORG`: organização do InfluxDB.
-- `INFLUX_BUCKET`: bucket de telemetria.
-- `INFLUX_RETENTION_DAYS`: retenção (dias) para criação automática do bucket.
-- `WS_MAX_CLIENTS`: limite de conexões websocket simultâneas.
-
-## Execução local com uv (recomendado)
+## Rodar local (uv)
 
 ```bash
 cd backend-fastapi
 cp .env.example .env
 uv sync
-uv run uvicorn app.main:app --reload --port 8000
+python scripts/download_face_landmarker.py
+alembic upgrade head
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-API local: `http://localhost:8000`
-
-## Testes
-
-```bash
-cd backend-fastapi
-uv run pytest
-```
-
-## Execução com Docker Compose
+## Rodar com Docker Compose (Postgres local)
 
 ```bash
 cd backend-fastapi
@@ -65,74 +63,67 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Com Podman:
+Serviços:
+- `backend` em `http://localhost:8000`
+- `postgres` em `localhost:5432`
+- `redis` opcional via profile `worker`
+
+Para habilitar Redis + worker:
+
+```bash
+docker compose --profile worker up -d redis
+```
+
+E rode o worker:
+
+```bash
+python -m app.worker
+```
+
+## Modo MVP x produção
+
+- **MVP local (sem Redis):** `FRAME_QUEUE_MODE=memory` (ou `sync`) + processamento no backend.
+- **Produção:** `FRAME_QUEUE_MODE=redis`, `REDIS_ENABLED=true` e worker separado consumindo `gazepilot:frames`.
+
+## Pareamento Dashboard x Firmware
+
+- O firmware tenta anexar em `GET /api/v1/sessions/active?device_id=...` antes de criar nova sessão.
+- `POST /api/v1/sessions/start` encerra sessões ativas anteriores do mesmo device.
+- Isso evita múltiplas sessões simultâneas e reduz o cenário de dashboard conectado em sessão errada.
+
+## Pipeline CV (MediaPipe + solvePnP)
+
+- Backend `CV_BACKEND=auto` tenta MediaPipe Face Landmarker primeiro.
+- Se modelo não existir ou MediaPipe falhar, cai para OpenCV fallback.
+- Head pose principal usa `solvePnP` com landmarks faciais.
+- Health endpoint mostra diagnóstico do backend CV (`cv_backend_active`, `mediapipe_available`, etc).
+
+Config útil em `.env`:
+
+- `CV_BACKEND=auto|mediapipe|opencv`
+- `CV_MEDIAPIPE_MODEL_PATH=models/face_landmarker.task`
+- `CV_BLINK_EAR_THRESHOLD=0.19`
+
+## Testes
 
 ```bash
 cd backend-fastapi
-cp .env.example .env
-podman compose up --build
+pytest
 ```
 
-## Endpoints
+## Deploy Render
 
-- `GET /api/v1/health`
-- `POST /api/v1/readings`
-- `GET /api/v1/readings/latest?device_id=esp32-wokwi-001`
-- `GET /api/v1/readings?device_id=esp32-wokwi-001&minutes=60&limit=200`
-- `WS /api/v1/ws/readings?device_id=esp32-wokwi-001`
-
-Comportamentos importantes:
-
-- Se o InfluxDB estiver indisponível, endpoints de leitura/escrita retornam `503`.
-- O websocket envia evento inicial `connected`.
-- Se houver `device_id` no websocket e já existir dado no banco, envia `latest_snapshot`.
-- Em cada ingestão, o websocket envia `reading_ingested` para clientes compatíveis com o filtro de `device_id`.
-- Se exceder `WS_MAX_CLIENTS`, a conexão recebe `overloaded` e fecha com código `1013`.
-
-## Exemplo de ingestão
+1. Criar **PostgreSQL Managed**.
+2. Criar **Web Service** apontando para `backend-fastapi`.
+3. Variáveis mínimas: `DATABASE_URL`, `FRAME_QUEUE_MODE`, `REDIS_*` (se usar worker), `WS_MAX_CLIENTS`.
+4. Start command sugerido:
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/readings" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "device_id":"esp32-wokwi-001",
-    "temperature_c":24.5,
-    "humidity_pct":62.3,
-    "pressure_hpa":1009.2,
-    "gas_resistance_ohm":12400,
-    "voc_index":33.8,
-    "air_quality_score":77.5,
-    "is_urgent":false,
-    "is_heartbeat":false,
-    "metadata":{"source":"manual-test"}
-  }'
+alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
 ```
 
-## Teste de websocket com websocat
+5. (Opcional) criar segundo serviço Worker com comando:
 
 ```bash
-websocat "ws://localhost:8000/api/v1/ws/readings?device_id=esp32-wokwi-001"
+python -m app.worker
 ```
-
-No terminal do websocat, envie:
-
-```text
-ping
-```
-
-A API deve responder com um evento `pong`.
-
-## Deploy (Render)
-
-Para usar com o frontend no Render:
-
-1. Suba este serviço como Web Service.
-2. Defina variáveis (`INFLUX_*`, `WS_MAX_CLIENTS`, etc).
-3. Garanta que `INFLUX_URL` seja acessível pelo serviço.
-4. Use a URL pública no frontend como `BACKEND_API_BASE_URL`.
-
-## Troubleshooting
-
-- `503 InfluxDB indisponivel`: validar `INFLUX_URL`, `INFLUX_TOKEN`, conectividade e permissões.
-- `404 em /readings/latest`: ainda não há leitura para o `device_id` informado.
-- WebSocket fecha com `1013`: limite de `WS_MAX_CLIENTS` atingido.
