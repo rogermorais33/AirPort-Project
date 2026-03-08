@@ -1,2 +1,6 @@
-// This repository uses PlatformIO sources in src/main_camera.cpp.
-// Keep this file only as compatibility note for Arduino IDE users.
+/*
+  Arduino IDE wrapper (modo camera completo).
+  Abre este arquivo no Arduino IDE e faça upload normalmente.
+*/
+
+#include "src/main_camera.cpp"
