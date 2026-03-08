@@ -1,19 +1,39 @@
-Edge Computing
+# Edge Computing — GazePilot (Edge Híbrido)
 
-Nosso Edge Computing vai ser aplicado na placa BME680 filtrando os dados do cheiro, temperatura e umidade, quando os dados estiverem estáveis não contendo alterações eles não serão enviados para API, mas para manter o monitoramento fora da placa, podemos mandar uma média das informações coletadas em um período de tempo, assim economizando no processamento.  
-Também podemos ter uma atualização em tempo real, quando a filtragem reconhecer um valor extremamente favorável à pragas requerendo uma urgência a esp32 pode mandar o sinal direto para o drone, evitando passar pela API.
+## Por que não processar CV completo no ESP32-CAM?
 
-Passo a Passo:
+A ESP32-CAM é excelente para captura e transmissão de imagem, mas limitada para inferência CV robusta em tempo real (landmarks, regressão de gaze, agregação histórica e regras avançadas).
 
-**Leitura e Normalização:** O ESP32 lê o BME680 (Gases/VOC, Temp, Umid).  
-**Análise de Desvio (Delta):** \* O sistema compara a leitura atual com a última leitura enviada.  
-**Se estável:** Os dados são acumulados em um buffer interno para cálculo de média.
+Limitações práticas no dispositivo:
 
-**Se alterado:** O sistema quebra o ciclo de espera e prepara o envio imediato.
+- CPU e RAM restritas para pipeline de visão mais complexo.
+- Variabilidade alta de qualidade de imagem e iluminação.
+- Custo de manter modelos atualizados no firmware.
 
-**Detecção de Urgência (Fator Praga):** \* O ESP32 cruza os dados (ex: Alta Umidade \+ VOC específico).  
-Se o padrão de "Risco de Pragas" for detectado, o ESP32 ignora a API e dispara um comando via protocolo leve (como ESP-NOW ou UDP) diretamente para o **Drone**.
+## Estratégia adotada: Edge Híbrido
 
-**Relatório de Manutenção (Heartbeat):**  
-Após X minutos de estabilidade, o ESP32 calcula a média aritmética do buffer e envia um único pacote para a API para manter o histórico atualizado.
+### No edge (ESP32-CAM)
 
+- Captura JPEG local.
+- Controle de taxa (fps configurável).
+- Upload dos frames com metadados para a API.
+- Heartbeat e busca de configuração remota.
+- Tentativa de anexar sessão ativa para manter consistência entre firmware e dashboard.
+
+### No backend
+
+- Processamento CV (MediaPipe Face Landmarker + solvePnP, com fallback OpenCV).
+- Engine de comandos com histerese/cooldown.
+- Persistência temporal e agregação de relatórios.
+- Publicação de eventos via websocket.
+
+## Benefícios
+
+- Firmware simples e estável.
+- Evolução de modelo sem regravar hardware.
+- Melhor observabilidade (latência, erro, confiança, anomalias).
+
+## Escalonamento
+
+- MVP: processamento síncrono/fila em memória.
+- Produção: Redis + worker dedicado para desacoplar ingestão e inferência.
