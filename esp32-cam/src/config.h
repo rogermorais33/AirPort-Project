@@ -6,7 +6,7 @@ static const char* WIFI_PASSWORD = "";
 
 // Backend base URL (http:// or https://)
 // Use o IP LAN da máquina que está rodando o backend.
-// Exemplo: http://192.168.86.2:8000
+// Exemplo: http://192.168.0.100:8000
 // Altere este valor antes do upload do firmware.
 // Para Wokwi cloud, localhost/IP LAN não funciona: use URL pública (Render/ngrok/cloudflared).
 static const char* API_BASE_URL = "http://192.168.0.100:8000";

@@ -55,7 +55,10 @@ bool initCamera() {
   Serial.println("[api-test] WOKWI_SIM enabled: camera capture is mocked");
   return true;
 #else
-  camera_config_t config;
+  esp_camera_deinit();
+
+  const bool has_psram = psramFound();
+  camera_config_t config = {};
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
   config.pin_d0 = Y2_GPIO_NUM;
@@ -76,12 +79,40 @@ bool initCamera() {
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-  config.frame_size = FRAMESIZE_QVGA;
-  config.jpeg_quality = 12;
-  config.fb_count = psramFound() ? 2 : 1;
-  config.fb_location = CAMERA_FB_IN_PSRAM;
+  config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
 
-  return esp_camera_init(&config) == ESP_OK;
+  if (has_psram) {
+    config.frame_size = FRAMESIZE_SVGA;
+    config.jpeg_quality = 12;
+    config.fb_count = 2;
+    config.fb_location = CAMERA_FB_IN_PSRAM;
+    config.grab_mode = CAMERA_GRAB_LATEST;
+  } else {
+    config.frame_size = FRAMESIZE_QVGA;
+    config.jpeg_quality = 14;
+    config.fb_count = 1;
+    config.fb_location = CAMERA_FB_IN_DRAM;
+  }
+
+  Serial.printf(
+      "[api-test] cfg psram=%s xclk=%u fb_count=%d quality=%d pins(xclk=%d,sda=%d,scl=%d,pclk=%d,vsync=%d,href=%d,pwdn=%d)\n",
+      has_psram ? "yes" : "no", config.xclk_freq_hz, config.fb_count, config.jpeg_quality,
+      config.pin_xclk, config.pin_sccb_sda, config.pin_sccb_scl, config.pin_pclk, config.pin_vsync,
+      config.pin_href, config.pin_pwdn);
+
+  esp_err_t err = esp_camera_init(&config);
+  if (err != ESP_OK) {
+    Serial.printf("[api-test] camera init failed: 0x%x\n", err);
+    return false;
+  }
+
+  sensor_t* sensor = esp_camera_sensor_get();
+  if (sensor != nullptr) {
+    sensor->set_framesize(sensor, FRAMESIZE_QVGA);
+    sensor->set_quality(sensor, 12);
+  }
+
+  return true;
 #endif
 }
 

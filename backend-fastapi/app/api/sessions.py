@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import Response
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
@@ -150,6 +151,35 @@ def list_pages(session_id: UUID, db: Session = Depends(get_db)) -> list[PageStar
         .limit(500)
     ).all()
     return [PageStartOut.model_validate(page) for page in pages]
+
+
+@router.get("/{session_id}/preview")
+def get_session_preview(
+    session_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    session = db.get(SessionModel, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    preview_store = getattr(request.app.state, "frame_preview", None)
+    if preview_store is None or not hasattr(preview_store, "get"):
+        raise HTTPException(status_code=503, detail="Preview service unavailable")
+
+    frame = preview_store.get(session.id)
+    if frame is None:
+        raise HTTPException(status_code=404, detail="No preview frame for this session yet")
+
+    return Response(
+        content=frame.image_bytes,
+        media_type=frame.content_type or "image/jpeg",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "X-Frame-Timestamp": frame.ts.isoformat(),
+            "X-Frame-Size": str(frame.size_bytes),
+        },
+    )
 
 
 def _close_active_page(db: Session, session_id: UUID, ended_at: datetime) -> None:

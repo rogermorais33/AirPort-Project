@@ -63,6 +63,10 @@ export function registerDevice(input: { name: string; fw_version?: string | null
   });
 }
 
+export function getDeviceByKey(deviceKey: string): Promise<Device> {
+  return requestApi<Device>(`/devices/key/${encodeURIComponent(deviceKey)}`);
+}
+
 export function heartbeatDevice(input: {
   device_id: string;
   device_key: string;

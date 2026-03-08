@@ -29,11 +29,13 @@ API FastAPI do **GazePilot** para ingestão de frames JPEG do ESP32-CAM, extraç
 - `POST /api/v1/devices/heartbeat`
 - `GET /api/v1/device-config/{device_id}`
 - `GET /api/v1/devices/config/{device_id}` (alias)
+- `GET /api/v1/devices/key/{device_key}`
 - `POST /api/v1/sessions/start`
 - `GET /api/v1/sessions/active?device_id=...`
 - `POST /api/v1/sessions/{id}/end`
 - `POST /api/v1/sessions/{id}/page`
 - `GET /api/v1/sessions/{id}/pages`
+- `GET /api/v1/sessions/{id}/preview` (JPEG do último frame em cache)
 - `POST /api/v1/frames` (multipart: `file`, `device_key`, `session_id`, `ts`)
 - `POST /api/v1/calibration/profile`
 - `POST /api/v1/calibration/{profile_id}/point`
@@ -90,6 +92,13 @@ python -m app.worker
 - O firmware tenta anexar em `GET /api/v1/sessions/active?device_id=...` antes de criar nova sessão.
 - `POST /api/v1/sessions/start` encerra sessões ativas anteriores do mesmo device.
 - Isso evita múltiplas sessões simultâneas e reduz o cenário de dashboard conectado em sessão errada.
+- `POST /api/v1/frames` retorna `404 Session is inactive` para sessão encerrada; o firmware usa isso para limpar `session_id` local e reanexar automaticamente.
+
+## Preview em tempo real
+
+- O backend mantém apenas o último frame por sessão em cache de memória (`FramePreviewStore`).
+- O dashboard consome esse frame via `GET /api/v1/sessions/{id}/preview`.
+- O cache é efêmero (reinício do container limpa o preview até novos frames chegarem).
 
 ## Pipeline CV (MediaPipe + solvePnP)
 

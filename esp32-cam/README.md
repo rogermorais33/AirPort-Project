@@ -20,6 +20,10 @@ Para Arduino IDE:
 - Pacote `esp32 by Espressif Systems` instalado
 - Biblioteca `ArduinoJson` instalada (Library Manager)
 
+Hardware e circuito completos:
+
+- Consulte [`../docs/HARDWARE.md`](../docs/HARDWARE.md) para pinagem, alimentacao, esquema eletrico e procedimento de flash com MB.
+
 ## Configuração
 
 Edite `src/config.h`:
@@ -117,17 +121,17 @@ Importante:
 
 ## Rodar no Arduino IDE
 
-Opção rápida (firmware principal):
-
-1. Abra `esp32-cam/sketch.ino` no Arduino IDE.
-2. Ajuste `src/config.h` (Wi-Fi e `API_BASE_URL`).
-3. Selecione a placa `AI Thinker ESP32-CAM`.
-4. Faça upload (com procedimento de `IO0 -> GND` se necessário).
-
-Opção com wrappers dedicados:
+No Arduino IDE, use os wrappers dedicados:
 
 - `arduino-ide/gazepilot_camera/gazepilot_camera.ino`
 - `arduino-ide/gazepilot_api_test/gazepilot_api_test.ino`
+
+Passos:
+
+1. Abra um dos arquivos acima no Arduino IDE.
+2. Ajuste `src/config.h` (Wi-Fi e `API_BASE_URL`).
+3. Selecione a placa `AI Thinker ESP32-CAM`.
+4. Faça upload (com procedimento de `IO0 -> GND` se necessário).
 
 Os wrappers reutilizam o mesmo código de `src/`, sem fork de lógica.
 
@@ -149,4 +153,4 @@ Se algum passo falhar no boot, o firmware tenta recuperação automática no `lo
 - O envio é feito em JPEG com `multipart/form-data`.
 - `fps` e `quality` podem ser ajustados pelo backend via endpoint de config.
 - Para produção HTTPS, o firmware usa `WiFiClientSecure` em modo `setInsecure()` (MVP).
-- Se o dashboard ficar em sessão diferente, use o botão `Attach Active` na página `/live`.
+- Se o dashboard ficar em sessão diferente, use `Sincronizar Sessão Ativa` na página `/live`.

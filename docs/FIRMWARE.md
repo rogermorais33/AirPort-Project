@@ -4,6 +4,10 @@
 
 Executar captura de frames no ESP32-CAM e publicar no backend GazePilot.
 
+Para circuito, pinagem detalhada, alimentação e fluxo de boot/flash com módulo MB, consulte:
+
+- [Guia de Hardware](HARDWARE.md)
+
 ## Arquivo de configuração
 
 `esp32-cam/src/config.h`
@@ -60,7 +64,6 @@ Limitação:
 
 Suporte disponível via wrappers:
 
-- `esp32-cam/sketch.ino` (modo camera principal)
 - `esp32-cam/arduino-ide/gazepilot_camera/gazepilot_camera.ino`
 - `esp32-cam/arduino-ide/gazepilot_api_test/gazepilot_api_test.ino`
 
@@ -97,15 +100,21 @@ Ao iniciar, ele tenta anexar à sessão ativa do mesmo device (`GET /sessions/ac
 
 Fluxo recomendado:
 
-1. No `/live`, registre o device.
+1. No `/live`, use `Vincular Existente` com o `device_key` provisionado no firmware.
 2. Faça upload/reboot do ESP32-CAM.
-3. Clique em `Attach Active` (ou inicie sessão MVP no dashboard).
+3. Clique em `Sincronizar Sessão Ativa` (ou `Iniciar Sessão MVP` no dashboard).
 4. Verifique no serial:
    - `[wifi] connected`
    - `[session] attached active id=...` ou `[session] id=...`
    - `[frame] status=202`
 
-Se `frames=0`, normalmente é sessão diferente entre dashboard e firmware. Use `Attach Active`.
+Se `frames=0`, normalmente é sessão diferente entre dashboard e firmware. Use `Sincronizar Sessão Ativa`.
+
+Se aparecer `[frame] status=404` com `Session is inactive`, é esperado após troca de sessão:
+
+- o firmware zera `g_session_id`;
+- no ciclo de recovery ele reanexa na sessão ativa (`/sessions/active`);
+- o preview volta a atualizar após novo attach.
 
 ## Diagnóstico rápido de upload/porta
 
@@ -116,6 +125,22 @@ Se `frames=0`, normalmente é sessão diferente entre dashboard e firmware. Use 
   - feche monitor serial/Arduino IDE/VS Code que esteja segurando a porta;
   - confirme a porta no Gerenciador de Dispositivos;
   - desconecte e reconecte o adaptador USB serial.
+
+## Diagnóstico rápido de câmera
+
+Se aparecer no serial:
+
+- `gpio_install_isr_service(...): GPIO isr service already installed`
+- `camera: Detected camera not supported`
+- `Camera probe failed with error 0x106`
+
+Checklist:
+
+1. Confirme placa `AI Thinker ESP32-CAM`.
+2. Confirme pinagem padrão AI Thinker (XCLK=0, SIOD=26, SIOC=27, Y2=5 ... Y9=35).
+3. Garanta alimentação estável (cabo USB de dados de boa qualidade, sem hub fraco).
+4. Use firmware atualizado (ele já faz `esp_camera_deinit()` antes de cada reinicialização da câmera).
+5. Faça reboot completo após upload: remover `IO0->GND` e pressionar `RST`.
 
 ## Limitações práticas
 

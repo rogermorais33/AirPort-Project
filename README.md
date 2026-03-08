@@ -66,7 +66,7 @@ Depois execute `Wokwi: Start Simulator` no VS Code.
 
 Arduino IDE:
 
-- Abra `esp32-cam/sketch.ino` (firmware principal) ou
+- `esp32-cam/arduino-ide/gazepilot_camera/gazepilot_camera.ino` (firmware principal).
 - `esp32-cam/arduino-ide/gazepilot_api_test/gazepilot_api_test.ino` (teste API).
 
 Sem `pio` no PATH:
@@ -117,8 +117,8 @@ make firmware-monitor PORT=COM5
    - `IO0 -> GND`, `RST`, upload.
    - remova `IO0 -> GND`, `RST`.
 5. Abra `/live`:
-   - registre device;
-   - clique em `Attach Active` para sincronizar com a sessão do firmware.
+   - use `Vincular Existente` com o `device_key` do firmware;
+   - clique em `Sincronizar Sessão Ativa` para alinhar dashboard e sessão do ESP32.
 6. Valide no serial:
    - `[wifi] connected`
    - `[session] ...`
@@ -128,6 +128,7 @@ make firmware-monitor PORT=COM5
 
 - [Arquitetura](docs/ARCHITECTURE.md)
 - [API](docs/API.md)
+- [Hardware](docs/HARDWARE.md)
 - [Firmware](docs/FIRMWARE.md)
 - [Calibração](docs/CALIBRATION.md)
 - [Privacidade](docs/PRIVACY.md)

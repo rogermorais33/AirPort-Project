@@ -9,6 +9,7 @@ from app.api import api_router
 from app.core.config import get_settings
 from app.db.session import init_db
 from app.services.frame_pipeline import FramePipelineService
+from app.services.frame_preview import FramePreviewStore
 from app.services.frame_queue import FrameQueueManager
 from app.services.ws_hub import LiveWebSocketHub
 
@@ -23,10 +24,12 @@ async def lifespan(app: FastAPI):
     ws_hub = LiveWebSocketHub(max_clients=settings.ws_max_clients)
     frame_pipeline = FramePipelineService(ws_hub=ws_hub)
     frame_queue = FrameQueueManager(pipeline=frame_pipeline)
+    frame_preview = FramePreviewStore(max_sessions=128, max_frame_bytes=settings.frame_max_bytes)
 
     app.state.ws_hub = ws_hub
     app.state.frame_pipeline = frame_pipeline
     app.state.frame_queue = frame_queue
+    app.state.frame_preview = frame_preview
 
     await frame_queue.start()
     yield

@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" role="img" aria-labelledby="title desc">
+  <title id="title">Esquema elétrico ESP32-CAM com módulo MB</title>
+  <desc id="desc">Diagrama de ligação com pinos e fios coloridos entre módulo MB, ESP32-CAM e USB do computador.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f6f8fc"/>
+      <stop offset="100%" stop-color="#e8edf7"/>
+    </linearGradient>
+    <linearGradient id="espBoard" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2b3a45"/>
+      <stop offset="100%" stop-color="#18232b"/>
+    </linearGradient>
+    <linearGradient id="mbBoard" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#5b2f76"/>
+      <stop offset="100%" stop-color="#3f2053"/>
+    </linearGradient>
+    <style>
+      .titulo { font-family: Arial, sans-serif; font-size: 34px; font-weight: 700; fill: #1c2740; }
+      .sub { font-family: Arial, sans-serif; font-size: 18px; fill: #445276; }
+      .rotulo { font-family: Arial, sans-serif; font-size: 18px; font-weight: 700; fill: #ffffff; }
+      .pinTxt { font-family: Consolas, monospace; font-size: 14px; font-weight: 700; fill: #0f172a; }
+      .pinTxtLight { font-family: Consolas, monospace; font-size: 13px; font-weight: 700; fill: #f3f7ff; }
+      .obs { font-family: Arial, sans-serif; font-size: 16px; fill: #2f3a59; }
+      .fio5v { stroke: #e53935; stroke-width: 5; fill: none; }
+      .fiognd { stroke: #232323; stroke-width: 5; fill: none; }
+      .fiorx { stroke: #1e88e5; stroke-width: 5; fill: none; }
+      .fiotx { stroke: #8e24aa; stroke-width: 5; fill: none; }
+      .fioio0 { stroke: #f9a825; stroke-width: 5; fill: none; stroke-dasharray: 12 8; }
+      .fioen { stroke: #00897b; stroke-width: 5; fill: none; stroke-dasharray: 12 8; }
+      .caixaInfo { fill: #ffffff; stroke: #a7b4d1; stroke-width: 2; }
+    </style>
+  </defs>
+
+  <rect width="1400" height="900" fill="url(#bg)"/>
+  <text x="700" y="60" text-anchor="middle" class="titulo">Esquema de Ligação: ESP32-CAM + Módulo MB</text>
+  <text x="700" y="95" text-anchor="middle" class="sub">Projeto GazePilot - alimentação, UART e controle de boot (IO0/EN)</text>
+
+  <!-- USB/PC -->
+  <rect x="70" y="185" width="250" height="180" rx="16" fill="#234" stroke="#4d6aa6" stroke-width="2"/>
+  <rect x="95" y="215" width="200" height="110" rx="8" fill="#10213c" stroke="#6284c5" stroke-width="1.8"/>
+  <text x="195" y="276" text-anchor="middle" class="rotulo">PC / Notebook</text>
+  <text x="195" y="305" text-anchor="middle" class="pinTxtLight">USB (dados + energia)</text>
+
+  <!-- ESP32-CAM-MB -->
+  <rect x="390" y="145" width="360" height="520" rx="20" fill="url(#mbBoard)" stroke="#8b69b4" stroke-width="3"/>
+  <text x="570" y="193" text-anchor="middle" class="rotulo">Módulo MB (CH340)</text>
+  <text x="570" y="220" text-anchor="middle" class="pinTxtLight">Adaptador USB-Serial para ESP32-CAM</text>
+
+  <rect x="430" y="255" width="280" height="58" rx="8" fill="#2f1140" stroke="#a180cc" stroke-width="1.5"/>
+  <text x="570" y="291" text-anchor="middle" class="pinTxtLight">Conector para ESP32-CAM</text>
+
+  <!-- MB pins -->
+  <rect x="430" y="355" width="46" height="28" rx="5" fill="#f3f6ff"/>
+  <rect x="430" y="392" width="46" height="28" rx="5" fill="#f3f6ff"/>
+  <rect x="430" y="429" width="46" height="28" rx="5" fill="#f3f6ff"/>
+  <rect x="430" y="466" width="46" height="28" rx="5" fill="#f3f6ff"/>
+  <rect x="430" y="503" width="46" height="28" rx="5" fill="#f3f6ff"/>
+  <rect x="430" y="540" width="46" height="28" rx="5" fill="#f3f6ff"/>
+  <text x="488" y="374" class="pinTxt">5V</text>
+  <text x="488" y="411" class="pinTxt">GND</text>
+  <text x="488" y="448" class="pinTxt">TXD</text>
+  <text x="488" y="485" class="pinTxt">RXD</text>
+  <text x="488" y="522" class="pinTxt">IO0</text>
+  <text x="488" y="559" class="pinTxt">EN</text>
+
+  <!-- ESP32-CAM -->
+  <rect x="890" y="120" width="390" height="620" rx="22" fill="url(#espBoard)" stroke="#607d8b" stroke-width="3"/>
+  <text x="1085" y="170" text-anchor="middle" class="rotulo">ESP32-CAM AI Thinker</text>
+  <text x="1085" y="198" text-anchor="middle" class="pinTxtLight">OV2640 + ESP32 (Wi-Fi 2.4 GHz)</text>
+
+  <rect x="995" y="238" width="180" height="155" rx="10" fill="#11181e" stroke="#88a3b5" stroke-width="2"/>
+  <circle cx="1085" cy="316" r="45" fill="#1b242d" stroke="#b8cddc" stroke-width="2.2"/>
+  <circle cx="1085" cy="316" r="23" fill="#070b0f" stroke="#d9e6ef" stroke-width="1.6"/>
+  <text x="1085" y="414" text-anchor="middle" class="pinTxtLight">Módulo de câmera OV2640</text>
+
+  <!-- ESP pins left side -->
+  <rect x="905" y="355" width="46" height="28" rx="5" fill="#dce8f3"/>
+  <rect x="905" y="392" width="46" height="28" rx="5" fill="#dce8f3"/>
+  <rect x="905" y="429" width="46" height="28" rx="5" fill="#dce8f3"/>
+  <rect x="905" y="466" width="46" height="28" rx="5" fill="#dce8f3"/>
+  <rect x="905" y="503" width="46" height="28" rx="5" fill="#dce8f3"/>
+  <rect x="905" y="540" width="46" height="28" rx="5" fill="#dce8f3"/>
+  <text x="960" y="374" class="pinTxt">5V</text>
+  <text x="960" y="411" class="pinTxt">GND</text>
+  <text x="960" y="448" class="pinTxt">U0R (GPIO3)</text>
+  <text x="960" y="485" class="pinTxt">U0T (GPIO1)</text>
+  <text x="960" y="522" class="pinTxt">IO0</text>
+  <text x="960" y="559" class="pinTxt">EN / RST</text>
+
+  <!-- Wires from PC to MB -->
+  <path d="M320 275 C350 275, 360 275, 390 275" stroke="#2b63d9" stroke-width="6" fill="none"/>
+  <text x="355" y="258" text-anchor="middle" class="sub" font-size="15">USB</text>
+
+  <!-- Wires MB -> ESP -->
+  <path d="M476 369 C670 369, 730 369, 905 369" class="fio5v"/>
+  <path d="M476 406 C670 406, 730 406, 905 406" class="fiognd"/>
+  <path d="M476 443 C670 443, 730 443, 905 443" class="fiorx"/>
+  <path d="M476 480 C670 480, 730 480, 905 480" class="fiotx"/>
+  <path d="M476 517 C670 517, 730 517, 905 517" class="fioio0"/>
+  <path d="M476 554 C670 554, 730 554, 905 554" class="fioen"/>
+
+  <!-- Legend -->
+  <rect x="70" y="410" width="250" height="230" rx="14" class="caixaInfo"/>
+  <text x="95" y="445" class="obs" font-weight="700">Legenda dos fios</text>
+  <line x1="95" y1="470" x2="160" y2="470" class="fio5v"/><text x="175" y="475" class="obs">5V</text>
+  <line x1="95" y1="500" x2="160" y2="500" class="fiognd"/><text x="175" y="505" class="obs">GND</text>
+  <line x1="95" y1="530" x2="160" y2="530" class="fiorx"/><text x="175" y="535" class="obs">TXD MB -> U0R ESP32</text>
+  <line x1="95" y1="560" x2="160" y2="560" class="fiotx"/><text x="175" y="565" class="obs">RXD MB -> U0T ESP32</text>
+  <line x1="95" y1="590" x2="160" y2="590" class="fioio0"/><text x="175" y="595" class="obs">IO0 (modo flash)</text>
+  <line x1="95" y1="620" x2="160" y2="620" class="fioen"/><text x="175" y="625" class="obs">EN/RST</text>
+
+  <!-- Boot procedure box -->
+  <rect x="70" y="690" width="1210" height="165" rx="14" class="caixaInfo"/>
+  <text x="95" y="728" class="obs" font-weight="700">Fluxo de gravação (ESP32-CAM-MB)</text>
+  <text x="95" y="758" class="obs">1) Coloque IO0 em GND (jumper) e pressione RST.  2) Faça upload via USB serial.</text>
+  <text x="95" y="786" class="obs">3) Remova o jumper IO0-GND.  4) Pressione RST novamente para iniciar em modo normal.</text>
+  <text x="95" y="814" class="obs">Dica: use cabo USB de dados de boa qualidade para evitar brownout e falhas no upload.</text>
+</svg>

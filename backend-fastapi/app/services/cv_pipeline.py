@@ -9,20 +9,24 @@ import numpy as np
 from app.core.config import get_settings
 
 settings = get_settings()
+_cv2_import_error: str | None = None
+_mediapipe_import_error: str | None = None
 
 try:
     import cv2
-except Exception:  # pragma: no cover - handled by fallback path
+except Exception as exc:  # pragma: no cover - handled by fallback path
     cv2 = None
+    _cv2_import_error = str(exc)
 
 try:
     import mediapipe as mp
     from mediapipe.tasks import python as mp_python
     from mediapipe.tasks.python import vision as mp_vision
-except Exception:  # pragma: no cover - handled by fallback path
+except Exception as exc:  # pragma: no cover - handled by fallback path
     mp = None
     mp_python = None
     mp_vision = None
+    _mediapipe_import_error = str(exc)
 
 
 @dataclass(slots=True)
@@ -47,6 +51,7 @@ class CVPipeline:
             self._backend_requested = "auto"
 
         self._cascade = None
+        self._cascade_profile = None
         self._landmarker = None
         self._mediapipe_error: str | None = None
         self._mediapipe_model_path = settings.cv_mediapipe_model_path
@@ -54,6 +59,8 @@ class CVPipeline:
         if cv2 is not None:
             cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
             self._cascade = cv2.CascadeClassifier(cascade_path)
+            profile_path = cv2.data.haarcascades + "haarcascade_profileface.xml"
+            self._cascade_profile = cv2.CascadeClassifier(profile_path)
 
         if self._backend_requested in {"auto", "mediapipe"}:
             self._initialize_mediapipe()
@@ -65,12 +72,19 @@ class CVPipeline:
         elif self._cascade is not None:
             active_backend = "opencv"
 
+        diagnostic_error = self._mediapipe_error
+        if active_backend == "none" and _cv2_import_error:
+            opencv_error = f"opencv import error: {_cv2_import_error}"
+            diagnostic_error = (
+                f"{diagnostic_error}; {opencv_error}" if diagnostic_error else opencv_error
+            )
+
         return {
             "cv_backend_requested": self._backend_requested,
             "cv_backend_active": active_backend,
             "mediapipe_available": self._landmarker is not None,
             "mediapipe_model": self._mediapipe_model_path if self._landmarker is not None else None,
-            "mediapipe_error": self._mediapipe_error,
+            "mediapipe_error": diagnostic_error,
         }
 
     def process_jpeg(self, frame_bytes: bytes) -> CVResult:
@@ -94,7 +108,7 @@ class CVPipeline:
 
     def _initialize_mediapipe(self) -> None:
         if mp is None or mp_python is None or mp_vision is None:
-            self._mediapipe_error = "mediapipe package not installed"
+            self._mediapipe_error = _mediapipe_import_error or "mediapipe package not installed"
             return
 
         model_path = Path(self._mediapipe_model_path)
@@ -184,18 +198,41 @@ class CVPipeline:
         assert cv2 is not None
 
         gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
-        faces = self._cascade.detectMultiScale(
+        frontal_faces = self._cascade.detectMultiScale(
             gray,
             scaleFactor=1.12,
             minNeighbors=5,
             minSize=(60, 60),
         )
+        detected_faces: list[tuple[int, int, int, int, str]] = [
+            (int(x), int(y), int(w), int(h), "frontal") for (x, y, w, h) in frontal_faces
+        ]
+
+        if self._cascade_profile is not None:
+            profile_faces = self._cascade_profile.detectMultiScale(
+                gray,
+                scaleFactor=1.12,
+                minNeighbors=4,
+                minSize=(52, 52),
+            )
+            detected_faces.extend((int(x), int(y), int(w), int(h), "profile_right") for (x, y, w, h) in profile_faces)
+
+            flipped = cv2.flip(gray, 1)
+            profile_faces_flipped = self._cascade_profile.detectMultiScale(
+                flipped,
+                scaleFactor=1.12,
+                minNeighbors=4,
+                minSize=(52, 52),
+            )
+            for x, y, fw, fh in profile_faces_flipped:
+                original_x = int(w - (x + fw))
+                detected_faces.append((original_x, int(y), int(fw), int(fh), "profile_left"))
 
         h, w = gray.shape[:2]
-        if len(faces) == 0:
+        if len(detected_faces) == 0:
             return self._fallback_result(backend="opencv")
 
-        x, y, fw, fh = max(faces, key=lambda item: item[2] * item[3])
+        x, y, fw, fh, face_kind = max(detected_faces, key=lambda item: item[2] * item[3])
         cx = x + fw / 2.0
         cy = y + fh / 2.0
 
@@ -203,11 +240,17 @@ class CVPipeline:
         face_y_norm = _clamp(cy / max(h, 1), 0.0, 1.0)
 
         yaw = _clamp((face_x_norm - 0.5) * 60.0, -45.0, 45.0)
+        if face_kind.startswith("profile"):
+            yaw = _clamp(yaw * 1.45, -45.0, 45.0)
+            if abs(yaw) < 20.0:
+                yaw = 20.0 if face_kind == "profile_right" else -20.0
         pitch = _clamp((0.5 - face_y_norm) * 50.0, -35.0, 35.0)
         roll = _estimate_roll(gray, x, y, fw, fh)
 
         area_ratio = (fw * fh) / float(max(w * h, 1))
         confidence = _clamp(0.45 + area_ratio * 4.5, 0.0, 0.95)
+        if face_kind.startswith("profile"):
+            confidence = _clamp(confidence + 0.06, 0.0, 0.98)
 
         eye_left = {
             "x": float(_clamp(face_x_norm - 0.08, 0.0, 1.0)),

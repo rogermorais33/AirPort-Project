@@ -21,7 +21,10 @@ class CommandDecision(NamedTuple):
 class SessionCommandState:
     ema_yaw: float = 0.0
     ema_pitch: float = 0.0
+    neutral_yaw: float = 0.0
+    neutral_pitch: float = 0.0
     initialized: bool = False
+    neutral_initialized: bool = False
     candidate_since: dict[str, datetime] = field(default_factory=dict)
     last_trigger_at: datetime = field(default_factory=lambda: datetime.fromtimestamp(0, tz=timezone.utc))
 
@@ -34,6 +37,7 @@ class CommandsEngine:
         self._cooldown_ms = settings.command_cooldown_ms
         self._yaw = settings.yaw_threshold_deg
         self._pitch = settings.pitch_threshold_deg
+        self._neutral_alpha = 0.02
 
     def evaluate(self, session_id: UUID, ts: datetime, yaw: float, pitch: float) -> list[CommandDecision]:
         state = self._states.setdefault(session_id, SessionCommandState())
@@ -46,6 +50,27 @@ class CommandsEngine:
             state.ema_yaw = self._alpha * yaw + (1.0 - self._alpha) * state.ema_yaw
             state.ema_pitch = self._alpha * pitch + (1.0 - self._alpha) * state.ema_pitch
 
+        if not state.neutral_initialized:
+            state.neutral_yaw = state.ema_yaw
+            state.neutral_pitch = state.ema_pitch
+            state.neutral_initialized = True
+
+        delta_yaw = state.ema_yaw - state.neutral_yaw
+        delta_pitch = state.ema_pitch - state.neutral_pitch
+
+        should_update_neutral = (
+            abs(delta_yaw) < self._yaw * 0.6
+            and abs(delta_pitch) < self._pitch * 0.6
+            and not state.candidate_since
+        )
+        if should_update_neutral:
+            state.neutral_yaw = self._neutral_alpha * state.ema_yaw + (1.0 - self._neutral_alpha) * state.neutral_yaw
+            state.neutral_pitch = (
+                self._neutral_alpha * state.ema_pitch + (1.0 - self._neutral_alpha) * state.neutral_pitch
+            )
+            delta_yaw = state.ema_yaw - state.neutral_yaw
+            delta_pitch = state.ema_pitch - state.neutral_pitch
+
         ms_since_last = (ts - state.last_trigger_at).total_seconds() * 1000.0
         if ms_since_last < self._cooldown_ms:
             self._update_candidates_without_trigger(state, ts)
@@ -54,26 +79,26 @@ class CommandsEngine:
         checks = [
             (
                 "NEXT",
-                state.ema_yaw > self._yaw,
-                abs(state.ema_yaw) / max(self._yaw, 1.0),
+                delta_yaw > self._yaw,
+                abs(delta_yaw) / max(self._yaw, 1.0),
                 f"yaw > +{self._yaw:g} for {self._dwell_ms}ms",
             ),
             (
                 "PREV",
-                state.ema_yaw < -self._yaw,
-                abs(state.ema_yaw) / max(self._yaw, 1.0),
+                delta_yaw < -self._yaw,
+                abs(delta_yaw) / max(self._yaw, 1.0),
                 f"yaw < -{self._yaw:g} for {self._dwell_ms}ms",
             ),
             (
                 "SCROLL_DOWN",
-                state.ema_pitch < -self._pitch,
-                abs(state.ema_pitch) / max(self._pitch, 1.0),
+                delta_pitch < -self._pitch,
+                abs(delta_pitch) / max(self._pitch, 1.0),
                 f"pitch < -{self._pitch:g} for {self._dwell_ms}ms",
             ),
             (
                 "SCROLL_UP",
-                state.ema_pitch > self._pitch,
-                abs(state.ema_pitch) / max(self._pitch, 1.0),
+                delta_pitch > self._pitch,
+                abs(delta_pitch) / max(self._pitch, 1.0),
                 f"pitch > +{self._pitch:g} for {self._dwell_ms}ms",
             ),
         ]
@@ -100,9 +125,9 @@ class CommandsEngine:
                     ]
             else:
                 # Hysteresis release threshold at 70% of trigger magnitude.
-                if command in {"NEXT", "PREV"} and abs(state.ema_yaw) < self._yaw * 0.7:
+                if command in {"NEXT", "PREV"} and abs(delta_yaw) < self._yaw * 0.7:
                     state.candidate_since.pop(command, None)
-                if command in {"SCROLL_DOWN", "SCROLL_UP"} and abs(state.ema_pitch) < self._pitch * 0.7:
+                if command in {"SCROLL_DOWN", "SCROLL_UP"} and abs(delta_pitch) < self._pitch * 0.7:
                     state.candidate_since.pop(command, None)
 
         return []

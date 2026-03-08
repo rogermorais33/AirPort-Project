@@ -26,8 +26,8 @@ Resposta inclui status de API/DB/fila e diagnóstico CV:
 - `GET /devices/config/{device_id}`
   - alias equivalente para clientes REST.
 - `GET /devices/key/{device_key}`
-  - resolve metadados de device a partir da chave.
-  - response: `{ "fps", "quality", "resolution", "max_frame_bytes" }`
+  - resolve metadados do device a partir da chave.
+  - response: `{ "id", "device_key", "name", "created_at", "fw_version" }`
 
 ## Sessions & Pages
 
@@ -42,6 +42,10 @@ Resposta inclui status de API/DB/fila e diagnóstico CV:
 - `GET /sessions?limit=50`
 - `GET /sessions/{id}`
 - `GET /sessions/{id}/pages`
+- `GET /sessions/{id}/preview`
+  - retorna o último frame da sessão (`image/jpeg`) armazenado em cache de memória.
+  - retorna `404` se ainda não houver frame no cache.
+  - retorna `503` se o serviço de preview não estiver inicializado.
 
 ## Frame Ingest
 
@@ -51,6 +55,11 @@ Resposta inclui status de API/DB/fila e diagnóstico CV:
   - `ts`: ISO8601 (opcional)
   - `device_key`: form field (ou `X-Device-Key` header, ou query param)
 - response `202`: `{ "status": "accepted", "frame_event_id", "processing_status" }`
+- erros comuns:
+  - `404 Session not found`
+  - `404 Session is inactive` (firmware deve limpar sessão local e reanexar sessão ativa)
+  - `403 Session does not belong to this device`
+  - `401 Invalid device key`
 
 `processing_status` pode ser `done`, `queued` ou `throttled`.
 

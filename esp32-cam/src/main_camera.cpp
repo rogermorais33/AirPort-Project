@@ -41,6 +41,12 @@ unsigned long g_last_heartbeat_ms = 0;
 unsigned long g_last_config_ms = 0;
 unsigned long g_last_recovery_ms = 0;
 
+void deinitCameraBestEffort() {
+  // When a previous init attempt fails halfway, driver resources (GPIO ISR) can
+  // remain allocated. Deinit before a new init avoids "ISR already installed".
+  esp_camera_deinit();
+}
+
 bool beginHttpClient(HTTPClient& http, const String& url) {
   if (url.startsWith("https://")) {
     static WiFiClientSecure secure_client;
@@ -50,6 +56,19 @@ bool beginHttpClient(HTTPClient& http, const String& url) {
 
   static WiFiClient plain_client;
   return http.begin(plain_client, url);
+}
+
+void logHttpFailure(const char* method, const String& url, int status, const String& body) {
+  if (status <= 0) {
+    Serial.printf("[http] %s %s status=%d err=%s\n", method, url.c_str(), status,
+                  HTTPClient::errorToString(status).c_str());
+  } else {
+    Serial.printf("[http] %s %s status=%d\n", method, url.c_str(), status);
+  }
+
+  if (body.length() > 0) {
+    Serial.println(body);
+  }
 }
 
 String isoTimestampUtc() {
@@ -101,7 +120,10 @@ void syncClock() {
 }
 
 bool initCamera() {
-  camera_config_t config;
+  deinitCameraBestEffort();
+
+  const bool has_psram = psramFound();
+  camera_config_t config = {};
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
   config.pin_d0 = Y2_GPIO_NUM;
@@ -122,15 +144,37 @@ bool initCamera() {
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-  config.frame_size = FRAMESIZE_QVGA;
-  config.jpeg_quality = g_jpeg_quality;
-  config.fb_count = psramFound() ? 2 : 1;
-  config.fb_location = CAMERA_FB_IN_PSRAM;
+  config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
+
+  if (has_psram) {
+    config.frame_size = FRAMESIZE_SVGA;
+    config.jpeg_quality = g_jpeg_quality;
+    config.fb_count = 2;
+    config.fb_location = CAMERA_FB_IN_PSRAM;
+    config.grab_mode = CAMERA_GRAB_LATEST;
+  } else {
+    config.frame_size = FRAMESIZE_QVGA;
+    config.jpeg_quality = max(12, g_jpeg_quality);
+    config.fb_count = 1;
+    config.fb_location = CAMERA_FB_IN_DRAM;
+  }
+
+  Serial.printf(
+      "[camera] cfg psram=%s xclk=%u fb_count=%d quality=%d pins(xclk=%d,sda=%d,scl=%d,pclk=%d,vsync=%d,href=%d,pwdn=%d)\n",
+      has_psram ? "yes" : "no", config.xclk_freq_hz, config.fb_count, config.jpeg_quality,
+      config.pin_xclk, config.pin_sccb_sda, config.pin_sccb_scl, config.pin_pclk, config.pin_vsync,
+      config.pin_href, config.pin_pwdn);
 
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
     Serial.printf("[camera] init failed: 0x%x\n", err);
     return false;
+  }
+
+  sensor_t* sensor = esp_camera_sensor_get();
+  if (sensor != nullptr) {
+    sensor->set_framesize(sensor, FRAMESIZE_QVGA);
+    sensor->set_quality(sensor, g_jpeg_quality);
   }
 
   Serial.println("[camera] initialized");
@@ -141,6 +185,7 @@ bool postJson(const String& endpoint, const String& payload, JsonDocument& out_d
   HTTPClient http;
   const String url = String(API_BASE_URL) + endpoint;
   if (!beginHttpClient(http, url)) {
+    Serial.printf("[http] POST begin failed url=%s\n", url.c_str());
     return false;
   }
 
@@ -150,8 +195,7 @@ bool postJson(const String& endpoint, const String& payload, JsonDocument& out_d
   http.end();
 
   if (status < 200 || status >= 300) {
-    Serial.printf("[http] POST %s status=%d\n", endpoint.c_str(), status);
-    Serial.println(body);
+    logHttpFailure("POST", url, status, body);
     return false;
   }
 
@@ -168,6 +212,7 @@ bool getJson(const String& endpoint, JsonDocument& out_doc) {
   HTTPClient http;
   const String url = String(API_BASE_URL) + endpoint;
   if (!beginHttpClient(http, url)) {
+    Serial.printf("[http] GET begin failed url=%s\n", url.c_str());
     return false;
   }
 
@@ -176,8 +221,7 @@ bool getJson(const String& endpoint, JsonDocument& out_doc) {
   http.end();
 
   if (status < 200 || status >= 300) {
-    Serial.printf("[http] GET %s status=%d\n", endpoint.c_str(), status);
-    Serial.println(body);
+    logHttpFailure("GET", url, status, body);
     return false;
   }
 
@@ -363,6 +407,7 @@ bool sendFrame() {
   const String url = String(API_BASE_URL) + "/api/v1/frames";
   bool started = beginHttpClient(http, url);
   if (!started) {
+    Serial.printf("[http] POST begin failed url=%s\n", url.c_str());
     esp_camera_fb_return(fb);
     return false;
   }
@@ -387,7 +432,7 @@ bool sendFrame() {
       Serial.println("[frame] session invalid, resetting session");
       g_session_id = "";
     }
-    Serial.println(response);
+    logHttpFailure("POST", url, status, response);
     return false;
   }
 

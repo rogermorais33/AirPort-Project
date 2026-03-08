@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="760" viewBox="0 0 1300 760" role="img" aria-labelledby="title desc">
+  <title id="title">Setup físico ESP32-CAM com módulo MB</title>
+  <desc id="desc">Ilustração do conjunto físico com notebook, cabo USB, módulo MB e placa ESP32-CAM acoplada.</desc>
+  <defs>
+    <linearGradient id="fundo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#eef3fb"/>
+      <stop offset="100%" stop-color="#dde7f6"/>
+    </linearGradient>
+    <linearGradient id="mb" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4b2d63"/>
+      <stop offset="100%" stop-color="#341f48"/>
+    </linearGradient>
+    <linearGradient id="esp" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2c3b46"/>
+      <stop offset="100%" stop-color="#182129"/>
+    </linearGradient>
+    <style>
+      .t1 { font-family: Arial, sans-serif; font-size: 32px; font-weight: 700; fill: #1a2847; }
+      .t2 { font-family: Arial, sans-serif; font-size: 18px; fill: #344467; }
+      .w { fill: #ffffff; font-family: Arial, sans-serif; }
+      .wstrong { fill: #ffffff; font-family: Arial, sans-serif; font-weight: 700; }
+      .lbl { fill: #0f172a; font-family: Arial, sans-serif; font-size: 16px; }
+      .mono { fill: #d9e7ff; font-family: Consolas, monospace; font-size: 13px; font-weight: 700; }
+    </style>
+  </defs>
+
+  <rect width="1300" height="760" fill="url(#fundo)"/>
+  <text x="650" y="58" text-anchor="middle" class="t1">Setup Físico Recomendado (ESP32-CAM + MB)</text>
+  <text x="650" y="88" text-anchor="middle" class="t2">Uso real: gravação, monitor serial e execução do firmware GazePilot</text>
+
+  <!-- Notebook -->
+  <g>
+    <rect x="70" y="210" width="300" height="210" rx="16" fill="#24406a" stroke="#547fbe" stroke-width="2"/>
+    <rect x="92" y="232" width="256" height="150" rx="10" fill="#0f203f" stroke="#6a94d3" stroke-width="1.6"/>
+    <text x="220" y="305" text-anchor="middle" class="wstrong" font-size="28">PC / Notebook</text>
+    <text x="220" y="333" text-anchor="middle" class="w" font-size="16">PlatformIO / Arduino IDE</text>
+    <rect x="365" y="295" width="20" height="34" rx="4" fill="#b2c2d8"/>
+    <text x="108" y="444" class="lbl">Cabo USB de dados (não apenas carga)</text>
+  </g>
+
+  <!-- USB cable -->
+  <path d="M385 312 C460 312, 520 280, 590 300" fill="none" stroke="#2f6fe0" stroke-width="7"/>
+  <text x="465" y="286" class="t2" font-size="15">USB</text>
+
+  <!-- MB board -->
+  <g>
+    <rect x="590" y="170" width="300" height="430" rx="22" fill="url(#mb)" stroke="#8e73ad" stroke-width="2.4"/>
+    <text x="740" y="220" text-anchor="middle" class="wstrong" font-size="24">Módulo MB (CH340)</text>
+    <text x="740" y="248" text-anchor="middle" class="w" font-size="15">USB-Serial + alimentação para ESP32-CAM</text>
+
+    <rect x="640" y="284" width="200" height="78" rx="8" fill="#2a113b" stroke="#9e82bf" stroke-width="1.6"/>
+    <text x="740" y="330" text-anchor="middle" class="mono">Encaixe da placa ESP32-CAM</text>
+
+    <circle cx="840" cy="205" r="9" fill="#43d989"/>
+    <text x="857" y="210" class="mono">PWR</text>
+
+    <rect x="628" y="388" width="225" height="180" rx="10" fill="#271238" stroke="#8f70b3" stroke-width="1.4"/>
+    <text x="740" y="418" text-anchor="middle" class="mono">Sinais:</text>
+    <text x="740" y="442" text-anchor="middle" class="mono">5V, GND, U0T, U0R</text>
+    <text x="740" y="466" text-anchor="middle" class="mono">IO0, EN/RST</text>
+    <text x="740" y="504" text-anchor="middle" class="mono">Algumas versões têm</text>
+    <text x="740" y="528" text-anchor="middle" class="mono">botões BOOT e RST</text>
+  </g>
+
+  <!-- ESP32-CAM board -->
+  <g>
+    <rect x="955" y="130" width="250" height="510" rx="20" fill="url(#esp)" stroke="#6e8a9a" stroke-width="2.6"/>
+    <text x="1080" y="178" text-anchor="middle" class="wstrong" font-size="24">ESP32-CAM</text>
+    <text x="1080" y="205" text-anchor="middle" class="w" font-size="15">AI Thinker</text>
+
+    <rect x="1004" y="245" width="152" height="126" rx="10" fill="#121b22" stroke="#90a8b9" stroke-width="1.8"/>
+    <circle cx="1080" cy="308" r="40" fill="#1e2a35" stroke="#c5d7e3" stroke-width="2.2"/>
+    <circle cx="1080" cy="308" r="21" fill="#090d11" stroke="#f0f7ff" stroke-width="1.4"/>
+    <text x="1080" y="397" text-anchor="middle" class="mono">OV2640</text>
+
+    <rect x="968" y="430" width="224" height="164" rx="10" fill="#111a22" stroke="#708795" stroke-width="1.5"/>
+    <text x="1080" y="460" text-anchor="middle" class="mono">Pinos críticos</text>
+    <text x="1080" y="486" text-anchor="middle" class="mono">5V / GND</text>
+    <text x="1080" y="510" text-anchor="middle" class="mono">U0R(GPIO3), U0T(GPIO1)</text>
+    <text x="1080" y="534" text-anchor="middle" class="mono">IO0 (flash) / EN(RST)</text>
+    <text x="1080" y="566" text-anchor="middle" class="mono">Wi-Fi 2.4GHz</text>
+  </g>
+
+  <!-- MB to ESP arrows -->
+  <path d="M890 300 C930 300, 935 300, 955 300" fill="none" stroke="#3abf9f" stroke-width="6"/>
+  <polygon points="948,292 965,300 948,308" fill="#3abf9f"/>
+  <text x="918" y="284" class="t2" font-size="14">serial + energia</text>
+
+  <!-- Procedure panel -->
+  <rect x="70" y="625" width="1135" height="110" rx="14" fill="#ffffff" stroke="#a4b4ce" stroke-width="2"/>
+  <text x="95" y="657" class="lbl" font-weight="700">Fluxo de gravação:</text>
+  <text x="95" y="683" class="lbl">1) IO0 -> GND   2) Pressione RST   3) Upload   4) Remova IO0-GND   5) Pressione RST</text>
+  <text x="95" y="710" class="lbl">Dica de estabilidade: use cabo USB curto e de boa qualidade para evitar reset/brownout.</text>
+</svg>

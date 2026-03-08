@@ -48,6 +48,10 @@ async def ingest_frame(
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    if not session.active:
+        # Returning 404 keeps firmware compatibility: it resets g_session_id and re-attaches active session.
+        raise HTTPException(status_code=404, detail="Session is inactive")
+
     if session.device_id != device.id:
         raise HTTPException(status_code=403, detail="Session does not belong to this device")
 
@@ -59,6 +63,10 @@ async def ingest_frame(
 
     if len(frame_bytes) > settings.frame_max_bytes:
         raise HTTPException(status_code=413, detail=f"Frame too large ({len(frame_bytes)} bytes)")
+
+    preview_store = getattr(request.app.state, "frame_preview", None)
+    if preview_store is not None and hasattr(preview_store, "put"):
+        preview_store.put(session.id, frame_bytes, content_type=(file.content_type or "image/jpeg"))
 
     frame_event = FrameEvent(
         session_id=session.id,
