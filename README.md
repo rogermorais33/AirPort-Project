@@ -64,6 +64,11 @@ python -m platformio run -d esp32-cam -e esp32-wokwi
 ```
 Depois execute `Wokwi: Start Simulator` no VS Code.
 
+Arduino IDE:
+
+- Abra `esp32-cam/sketch.ino` (firmware principal) ou
+- `esp32-cam/arduino-ide/gazepilot_api_test/gazepilot_api_test.ino` (teste API).
+
 Sem `pio` no PATH:
 
 ```bash

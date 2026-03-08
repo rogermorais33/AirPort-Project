@@ -56,6 +56,22 @@ Limitação:
 - não há câmera OV2640 real no Wokwi neste modo; a captura é mock.
 - para `GET /health` funcionar no Wokwi cloud, use `API_BASE_URL` pública (Render/ngrok/cloudflared), não `localhost`.
 
+## Arduino IDE
+
+Suporte disponível via wrappers:
+
+- `esp32-cam/sketch.ino` (modo camera principal)
+- `esp32-cam/arduino-ide/gazepilot_camera/gazepilot_camera.ino`
+- `esp32-cam/arduino-ide/gazepilot_api_test/gazepilot_api_test.ino`
+
+Passos:
+
+1. Instale `esp32 by Espressif Systems` no Boards Manager.
+2. Instale `ArduinoJson` no Library Manager.
+3. Edite `esp32-cam/src/config.h`.
+4. Selecione `AI Thinker ESP32-CAM`.
+5. Faça upload com o fluxo de boot (`IO0 -> GND`, `RST`, upload, remover `IO0`, `RST`).
+
 ## Flash manual (ESP32-CAM-MB)
 
 1. Ligue `IO0 -> GND` (modo flash).

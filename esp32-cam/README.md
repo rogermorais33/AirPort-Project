@@ -15,6 +15,11 @@ Firmware para **ESP32-CAM (AI Thinker)** que captura frames JPEG e envia para o 
 - Programador USB serial (ESP32-CAM-MB ou FTDI)
 - PlatformIO (`pio`) instalado
 
+Para Arduino IDE:
+
+- Pacote `esp32 by Espressif Systems` instalado
+- Biblioteca `ArduinoJson` instalada (Library Manager)
+
 ## Configuração
 
 Edite `src/config.h`:
@@ -109,6 +114,22 @@ Importante:
 
 - Wokwi cloud não alcança `localhost`/IP LAN da sua máquina.
 - Para testar API no Wokwi, configure `API_BASE_URL` com URL pública (Render/ngrok/cloudflared tunnel).
+
+## Rodar no Arduino IDE
+
+Opção rápida (firmware principal):
+
+1. Abra `esp32-cam/sketch.ino` no Arduino IDE.
+2. Ajuste `src/config.h` (Wi-Fi e `API_BASE_URL`).
+3. Selecione a placa `AI Thinker ESP32-CAM`.
+4. Faça upload (com procedimento de `IO0 -> GND` se necessário).
+
+Opção com wrappers dedicados:
+
+- `arduino-ide/gazepilot_camera/gazepilot_camera.ino`
+- `arduino-ide/gazepilot_api_test/gazepilot_api_test.ino`
+
+Os wrappers reutilizam o mesmo código de `src/`, sem fork de lógica.
 
 ## Fluxo do firmware
 
