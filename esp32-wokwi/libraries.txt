@@ -1,3 +1,0 @@
-Adafruit BME680 Library
-Adafruit Unified Sensor
-ArduinoJson

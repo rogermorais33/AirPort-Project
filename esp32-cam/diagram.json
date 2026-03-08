@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "author": "GazePilot",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-esp32-devkit-v1",
+      "id": "esp",
+      "top": -4.8,
+      "left": -80.48,
+      "attrs": {}
+    }
+  ],
+  "connections": [],
+  "dependencies": {}
+}
