@@ -8,9 +8,10 @@ interface GazeOverlayProps {
   x: number | null;
   y: number | null;
   confidence?: number;
+  blink?: boolean;
 }
 
-export function GazeOverlay({ width, height, x, y, confidence = 0 }: GazeOverlayProps) {
+export function GazeOverlay({ width, height, x, y, confidence = 0, blink = false }: GazeOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -50,24 +51,35 @@ export function GazeOverlay({ width, height, x, y, confidence = 0 }: GazeOverlay
 
     const px = Math.max(0, Math.min(width, x));
     const py = Math.max(0, Math.min(height, y));
-    const radius = 10 + confidence * 8;
+    let radius = 10 + confidence * 8;
+    
+    // Apply visual blink effect (shrink and change color)
+    if (blink) {
+      radius = Math.max(4, radius * 0.4);
+    }
 
     const gradient = ctx.createRadialGradient(px, py, 2, px, py, radius + 18);
-    gradient.addColorStop(0, "rgba(16, 185, 129, 0.85)");
-    gradient.addColorStop(1, "rgba(16, 185, 129, 0)");
+    
+    if (blink) {
+       gradient.addColorStop(0, "rgba(52, 211, 153, 0.95)"); // Brighter emerald when blinking
+       gradient.addColorStop(1, "rgba(52, 211, 153, 0)");
+    } else {
+       gradient.addColorStop(0, "rgba(16, 185, 129, 0.85)");
+       gradient.addColorStop(1, "rgba(16, 185, 129, 0)");
+    }
 
     ctx.fillStyle = gradient;
     ctx.beginPath();
     ctx.arc(px, py, radius + 18, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = "#f4f4f5";
+    ctx.fillStyle = blink ? "#a7f3d0" : "#f4f4f5"; // change inner core color on blink
     ctx.beginPath();
     ctx.arc(px, py, radius, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.strokeStyle = "#10b981";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = blink ? "#34d399" : "#10b981"; // change stroke color on blink
+    ctx.lineWidth = blink ? 3 : 2;
     ctx.beginPath();
     ctx.arc(px, py, radius + 6, 0, Math.PI * 2);
     ctx.stroke();

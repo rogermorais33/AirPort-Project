@@ -104,6 +104,7 @@ export function useDashboardData(sessionId: string | null) {
       confidence: metrics?.confidence ?? 0,
       faceDetected: Boolean(metrics?.face_detected),
       backend: metrics?.backend ?? "unknown",
+      isBlinking: Boolean(metrics?.features?.blink),
     };
   }, [state.faceMetrics]);
 

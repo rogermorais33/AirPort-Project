@@ -668,6 +668,7 @@ export default function LivePage() {
             x={gazeCanvasPoint.x}
             y={gazeCanvasPoint.y}
             confidence={gazePoint?.confidence ?? 0}
+            blink={pose.isBlinking}
           />
         </div>
 
