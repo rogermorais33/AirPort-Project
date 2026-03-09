@@ -10,6 +10,7 @@ As figuras desta pasta são autorais e em PT-BR:
 
 - Ilustração do setup físico: `docs/assets/hardware/esp32-cam-setup.svg`
 - Esquema elétrico de ligação (fiação/pinos): `docs/assets/hardware/esp32-cam-mb-schematic.svg`
+- Referência visual adicional de pinagem MB+ESP32-CAM: `docs/assets/hardware/esp32-cam-circuit-reference.png`
 
 ## 1) Setup físico
 
@@ -27,6 +28,15 @@ As figuras desta pasta são autorais e em PT-BR:
 ## 2) Esquema elétrico (MB + ESP32-CAM)
 
 ![Esquema elétrico ESP32-CAM MB](assets/hardware/esp32-cam-mb-schematic.svg)
+
+### Referência visual alternativa (imagem)
+
+![Circuito ESP32-CAM MB (referência)](assets/hardware/esp32-cam-circuit-reference.png)
+
+Observação:
+
+- esta imagem é uma referência visual complementar;
+- para validação técnica/pinagem oficial do projeto, mantenha o esquema autoral acima como fonte principal.
 
 Resumo elétrico:
 

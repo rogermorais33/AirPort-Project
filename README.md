@@ -132,3 +132,10 @@ make firmware-monitor PORT=COM5
 - [Firmware](docs/FIRMWARE.md)
 - [Calibração](docs/CALIBRATION.md)
 - [Privacidade](docs/PRIVACY.md)
+
+## Documentação por módulo
+
+- [Backend FastAPI](backend-fastapi/README.md)
+- [Frontend Next.js](frontend-nextjs/README.md)
+- [Firmware ESP32-CAM](esp32-cam/README.md)
+- [Browser Extension](browser-extension/README.md)
