@@ -29,6 +29,7 @@ async function proxyRequest(
   headers.delete("host");
   headers.delete("connection");
   headers.delete("content-length");
+  headers.delete("accept-encoding");
 
   const init: RequestInit = {
     method,
@@ -45,6 +46,9 @@ async function proxyRequest(
   const outputHeaders = new Headers();
   for (const [key, value] of response.headers.entries()) {
     if (key.toLowerCase() === "content-length") {
+      continue;
+    }
+    if (key.toLowerCase() === "content-encoding") {
       continue;
     }
     outputHeaders.set(key, value);
