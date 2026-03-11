@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { CommandLog } from "@/components/gazepilot/command-log";
+import { CommandReplayLab } from "@/components/gazepilot/command-replay-lab";
 import { HeatmapViewer } from "@/components/gazepilot/heatmap-viewer";
 import {
   getSessionCommands,
@@ -45,7 +46,7 @@ export default function SessionDetailsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Session Report</h1>
+      <h1 className="text-xl font-semibold">Relatório da sessão</h1>
       {error ? <p className="text-sm text-rose-300">{error}</p> : null}
 
       {report ? (
@@ -53,15 +54,19 @@ export default function SessionDetailsPage() {
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
             <p className="text-xs uppercase tracking-[0.22em] text-zinc-500">Frames</p>
             <p className="mt-2 text-3xl font-semibold text-zinc-100">{report.frames_total}</p>
-            <p className="text-sm text-zinc-400">done: {report.frames_done} | error: {report.frames_error}</p>
+            <p className="text-sm text-zinc-400">
+              processados: {report.frames_done} | com erro: {report.frames_error}
+            </p>
           </div>
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-            <p className="text-xs uppercase tracking-[0.22em] text-zinc-500">Commands</p>
+            <p className="text-xs uppercase tracking-[0.22em] text-zinc-500">Comandos</p>
             <p className="mt-2 text-3xl font-semibold text-zinc-100">{report.commands_total}</p>
-            <p className="text-sm text-zinc-400">latency média: {report.avg_latency_ms?.toFixed(1) ?? "-"} ms</p>
+            <p className="text-sm text-zinc-400">
+              latência média: {report.avg_latency_ms?.toFixed(1) ?? "-"} ms
+            </p>
           </div>
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-            <p className="text-xs uppercase tracking-[0.22em] text-zinc-500">Face Detection</p>
+            <p className="text-xs uppercase tracking-[0.22em] text-zinc-500">Detecção facial</p>
             <p className="mt-2 text-3xl font-semibold text-zinc-100">
               {(report.face_detection_rate * 100).toFixed(1)}%
             </p>
@@ -71,27 +76,27 @@ export default function SessionDetailsPage() {
       ) : null}
 
       <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-        <p className="mb-3 text-sm font-semibold">Heatmap</p>
+        <p className="mb-3 text-sm font-semibold">Mapa de calor</p>
         {heatmap ? (
           <>
             <HeatmapViewer bins={heatmap.bins} maxBin={heatmap.max_bin} />
             <p className="mt-2 text-sm text-zinc-400">Total de pontos: {heatmap.total_points}</p>
           </>
         ) : (
-          <p className="text-sm text-zinc-500">Carregando heatmap...</p>
+          <p className="text-sm text-zinc-500">Carregando mapa de calor...</p>
         )}
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-          <p className="mb-3 text-sm font-semibold">Timeline (frames/comandos por segundo)</p>
+          <p className="mb-3 text-sm font-semibold">Linha do tempo (frames/comandos por segundo)</p>
           <div className="max-h-80 overflow-auto rounded-xl border border-zinc-800">
             <table className="w-full text-sm">
               <thead className="bg-zinc-900 text-zinc-500">
                 <tr>
                   <th className="px-3 py-2 text-left">Timestamp</th>
                   <th className="px-3 py-2 text-left">Frames</th>
-                  <th className="px-3 py-2 text-left">Commands</th>
+                  <th className="px-3 py-2 text-left">Comandos</th>
                 </tr>
               </thead>
               <tbody>
@@ -107,11 +112,15 @@ export default function SessionDetailsPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-          <p className="mb-3 text-sm font-semibold">Command Log</p>
-          <CommandLog commands={commands} />
+        <div className="flex min-h-[320px] flex-col rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
+          <p className="mb-3 text-sm font-semibold">Log de comandos</p>
+          <div className="min-h-0 flex-1">
+            <CommandLog commands={commands} />
+          </div>
         </div>
       </section>
+
+      <CommandReplayLab commands={commands} />
     </div>
   );
 }
