@@ -12,9 +12,9 @@ GazePilot é um sistema híbrido para navegação hands-free:
 
 O diagrama principal da arquitetura do projeto passa a ser a imagem final abaixo:
 
-![Overview da arquitetura do AirPort Project](assets/architecture/arquitetura_overview_airport_project_final.png)
+![Overview da arquitetura do AirPort Project](assets/architecture/arquitetura_overview.png)
 
-Arquivo fonte: `docs/assets/architecture/arquitetura_overview_airport_project_final.png`
+Arquivo fonte: `docs/assets/architecture/arquitetura_overview.png`
 
 Ela resume a separação entre:
 
