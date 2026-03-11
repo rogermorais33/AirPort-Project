@@ -8,6 +8,22 @@ GazePilot é um sistema híbrido para navegação hands-free:
 2. **FastAPI** processa head pose/gaze, persiste eventos no PostgreSQL e publica eventos em WebSocket.
 3. **Next.js Dashboard** consome REST + WS para live monitoring, calibração e relatórios com heatmap.
 
+## Overview da arquitetura
+
+O diagrama principal da arquitetura do projeto passa a ser a imagem final abaixo:
+
+![Overview da arquitetura do AirPort Project](assets/architecture/arquitetura_overview_airport_project_final.png)
+
+Arquivo fonte: `docs/assets/architecture/arquitetura_overview_airport_project_final.png`
+
+Ela resume a separação entre:
+
+- captura no edge com ESP32-CAM;
+- ingestao e processamento no backend FastAPI;
+- persistencia em PostgreSQL;
+- distribuicao de eventos por WebSocket;
+- consumo no dashboard web.
+
 ## Componentes
 
 ### 1) Firmware (`esp32-cam`)
@@ -78,6 +94,46 @@ Tabelas principais:
 - gaze_points
 - commands
 - anomalies
+
+## Por que o domínio é fortemente relacional
+
+O centro do sistema é um grafo de entidades com dependência forte:
+
+- `devices -> sessions -> frame_events` (todo frame pertence a um device e a uma sessão)
+- `frame_events -> face_metrics` (1:1)
+- `frame_events -> gaze_points` (1:N)
+- `sessions -> commands / anomalies / pages` (1:N)
+- `pages -> gaze_points` (contexto de página ativo, opcional por ponto)
+- `calibration_profiles -> calibration_points` por `device_id`
+
+Esse padrão exige:
+
+- integridade referencial (FK/UNQ)
+- joins frequentes para relatório (`summary`, `heatmap`, `timeline`, `commands`)
+- consistência transacional (ex.: uma sessão ativa por dispositivo)
+
+Por isso PostgreSQL atende bem o núcleo operacional atual.
+
+## Escalabilidade temporal (13k+ frames em minutos)
+
+`13k` frames em poucos minutos já é um volume de série temporal relevante, mas ainda totalmente tratável em PostgreSQL com índice e retenção corretos.
+
+Evolução recomendada:
+
+1. curto prazo: manter PostgreSQL atual com índices em `session_id`, `device_id`, `ts` e políticas de retenção.
+2. médio prazo: particionamento por tempo (`frame_events`, `gaze_points`, `commands`).
+3. médio/longo prazo: habilitar TimescaleDB (PostgreSQL + hypertables) para compressão e agregações temporais pesadas.
+4. longo prazo (se analytics crescer muito): dual-store analítico, mantendo PostgreSQL operacional como fonte transacional.
+
+Resumo: não é "Postgres versus time-series". O caminho natural é **Postgres agora**, e **Timescale/particionamento** quando o throughput e retenção exigirem.
+
+## Materiais de aula lidos (extração para texto)
+
+Leitura feita com `pypdf`, com extração completa para:
+
+- `docs/references/slides/Aula 2 - Grupos, Projetos e Entregas e SP1.txt`
+- `docs/references/slides/Aula 2 - parte 2 - Building Blocks HTTP - SP1.txt`
+- `docs/references/slides/Aula 2 - parte 2 - Building Blocks HTTP - SP1 com Codespaces.txt`
 
 ## Deploy (Render)
 
