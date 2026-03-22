@@ -3,15 +3,25 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getHealth } from "@/lib/api";
-import type { CommandEvent, FaceMetricsEvent, GazePointEvent, HealthStatus, WsEnvelope } from "@/lib/types";
+import type {
+  CommandEvent,
+  FaceMetricsEvent,
+  FrameProcessedEvent,
+  GazePointEvent,
+  HealthStatus,
+  WsEnvelope,
+} from "@/lib/types";
 import { useWebSocket } from "@/hooks/use-websocket";
 
 interface DashboardDataState {
   health: HealthStatus | null;
   faceMetrics: FaceMetricsEvent | null;
   gazePoint: GazePointEvent | null;
+  lastFrame: FrameProcessedEvent | null;
   commands: CommandEvent[];
   framesProcessed: number;
+  blinkCount: number;
+  lastBlinkAt: string | null;
   lastError: string | null;
 }
 
@@ -20,8 +30,11 @@ export function useDashboardData(sessionId: string | null) {
     health: null,
     faceMetrics: null,
     gazePoint: null,
+    lastFrame: null,
     commands: [],
     framesProcessed: 0,
+    blinkCount: 0,
+    lastBlinkAt: null,
     lastError: null,
   });
 
@@ -50,8 +63,10 @@ export function useDashboardData(sessionId: string | null) {
 
   const onWsEvent = useCallback((event: WsEnvelope) => {
     if (event.type === "frame_processed") {
+      const frameData = (event.data as unknown as FrameProcessedEvent) ?? null;
       setState((current) => ({
         ...current,
+        lastFrame: frameData,
         framesProcessed: current.framesProcessed + 1,
       }));
       return;
@@ -62,6 +77,10 @@ export function useDashboardData(sessionId: string | null) {
       setState((current) => ({
         ...current,
         faceMetrics,
+        blinkCount:
+          faceMetrics.blink && !current.faceMetrics?.blink ? current.blinkCount + 1 : current.blinkCount,
+        lastBlinkAt:
+          faceMetrics.blink && !current.faceMetrics?.blink ? event.timestamp ?? current.lastBlinkAt : current.lastBlinkAt,
       }));
       return;
     }

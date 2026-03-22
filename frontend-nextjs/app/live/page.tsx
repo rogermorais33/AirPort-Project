@@ -1,6 +1,16 @@
 "use client";
 
+import type { ComponentType, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
+import {
+  Activity,
+  Camera,
+  Globe,
+  Play,
+  RefreshCcw,
+  Sparkles,
+  Wifi,
+} from "lucide-react";
 
 import {
   endSession,
@@ -11,31 +21,22 @@ import {
   registerDevice,
   startSession,
 } from "@/lib/api";
-import type { Device, Session } from "@/lib/types";
-import { useDashboardData } from "@/hooks/use-dashboard-data";
+import { AttentionCompass } from "@/components/gazepilot/attention-compass";
+import { BlinkMemory } from "@/components/gazepilot/blink-memory";
 import { CommandLog } from "@/components/gazepilot/command-log";
+import { GazeArcade } from "@/components/gazepilot/gaze-arcade";
 import { GazeOverlay } from "@/components/gazepilot/gaze-overlay";
+import { GazeWorld } from "@/components/gazepilot/gaze-world";
 import { LivePreview } from "@/components/gazepilot/live-preview";
 import { PoseMeter } from "@/components/gazepilot/pose-meter";
+import { useDashboardData } from "@/hooks/use-dashboard-data";
+import { deriveAttentionState } from "@/lib/gaze";
+import type { Device, Session } from "@/lib/types";
 
 const DEVICE_STORAGE_KEY = "gazepilot-device-v1";
 const SESSION_STORAGE_KEY = "gazepilot-session-v1";
 const YAW_THRESHOLD = 20;
 const PITCH_THRESHOLD = 15;
-
-const SUPPORTED_ACTIONS = [
-  { command: "NEXT", movement: "Girar cabeça para direita", trigger: "yaw > +20° por ~400ms" },
-  { command: "PREV", movement: "Girar cabeça para esquerda", trigger: "yaw < -20° por ~400ms" },
-  { command: "SCROLL_DOWN", movement: "Inclinar cabeça para baixo", trigger: "pitch < -15° por ~400ms" },
-  { command: "SCROLL_UP", movement: "Inclinar cabeça para cima", trigger: "pitch > +15° por ~400ms" },
-];
-const RECOGNIZED_SIGNALS = [
-  { name: "Yaw", meaning: "giro horizontal da cabeça" },
-  { name: "Pitch", meaning: "inclinação vertical da cabeça" },
-  { name: "Roll", meaning: "inclinação lateral da cabeça" },
-  { name: "Blink", meaning: "piscar detectado (informativo)" },
-  { name: "Face X/Y", meaning: "posição normalizada do rosto no frame" },
-];
 
 function inferCandidateAction(yaw: number, pitch: number): string | null {
   if (yaw > YAW_THRESHOLD) {
@@ -53,6 +54,25 @@ function inferCandidateAction(yaw: number, pitch: number): string | null {
   return null;
 }
 
+function mapDirectionToCommand(direction: "left" | "right" | "up" | "down" | "center"): string | null {
+  switch (direction) {
+    case "right":
+      return "NEXT";
+    case "left":
+      return "PREV";
+    case "up":
+      return "SCROLL_UP";
+    case "down":
+      return "SCROLL_DOWN";
+    default:
+      return null;
+  }
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
 export default function LivePage() {
   const [deviceName, setDeviceName] = useState("ESP32-CAM Desk");
   const [device, setDevice] = useState<Device | null>(null);
@@ -63,9 +83,19 @@ export default function LivePage() {
   const [pageUrl, setPageUrl] = useState("https://example.com");
   const [neutralPose, setNeutralPose] = useState<{ yaw: number; pitch: number } | null>(null);
 
-  const { health, pose, gazePoint, commands, framesProcessed, wsStatus, refreshHealth, faceMetrics } = useDashboardData(
-    session?.id ?? null,
-  );
+  const {
+    health,
+    pose,
+    gazePoint,
+    commands,
+    framesProcessed,
+    wsStatus,
+    refreshHealth,
+    faceMetrics,
+    lastFrame,
+    blinkCount,
+    lastBlinkAt,
+  } = useDashboardData(session?.id ?? null);
 
   useEffect(() => {
     const storedDevice = localStorage.getItem(DEVICE_STORAGE_KEY);
@@ -78,7 +108,7 @@ export default function LivePage() {
         setDevice(parsedDevice);
         setManualDeviceId(parsedDevice.id);
         setManualDeviceKey(parsedDevice.device_key);
-        setStatusMessage("Contexto local carregado do navegador.");
+        setStatusMessage("Contexto local restaurado.");
       } catch {
         localStorage.removeItem(DEVICE_STORAGE_KEY);
       }
@@ -109,7 +139,7 @@ export default function LivePage() {
         device_key: device.device_key,
         fw_version: device.fw_version,
       }).catch(() => {
-        // Heartbeat failures are reflected in backend health/WS status.
+        // Heartbeat failures surface via ws/health.
       });
     }, 20_000);
 
@@ -117,35 +147,6 @@ export default function LivePage() {
       window.clearInterval(interval);
     };
   }, [device]);
-
-  const overlayWidth = 900;
-  const overlayHeight = 360;
-
-  const gazeCanvasPoint = useMemo(() => {
-    if (!gazePoint) {
-      return { x: null, y: null };
-    }
-
-    if (session?.screen_w && session.screen_h) {
-      return {
-        x: (gazePoint.x / session.screen_w) * overlayWidth,
-        y: (gazePoint.y / session.screen_h) * overlayHeight,
-      };
-    }
-
-    const isNormalized = gazePoint.x >= 0 && gazePoint.x <= 1 && gazePoint.y >= 0 && gazePoint.y <= 1;
-    if (isNormalized) {
-      return {
-        x: gazePoint.x * overlayWidth,
-        y: gazePoint.y * overlayHeight,
-      };
-    }
-
-    return {
-      x: gazePoint.x,
-      y: gazePoint.y,
-    };
-  }, [gazePoint, session]);
 
   useEffect(() => {
     if (!session?.id) {
@@ -179,11 +180,76 @@ export default function LivePage() {
 
   const centeredYaw = pose.yaw - (neutralPose?.yaw ?? 0);
   const centeredPitch = pose.pitch - (neutralPose?.pitch ?? 0);
-  const candidateAction = useMemo(() => inferCandidateAction(centeredYaw, centeredPitch), [centeredPitch, centeredYaw]);
+  const attentionState = useMemo(
+    () =>
+      deriveAttentionState({
+        faceMetrics,
+        centeredYaw,
+        centeredPitch,
+      }),
+    [centeredPitch, centeredYaw, faceMetrics],
+  );
+  const poseCandidateAction = useMemo(() => inferCandidateAction(centeredYaw, centeredPitch), [centeredPitch, centeredYaw]);
+  const liveIntent = useMemo(() => mapDirectionToCommand(attentionState.direction), [attentionState.direction]);
+  const suggestedAction = attentionState.direction === "center" ? poseCandidateAction : liveIntent;
+
+  const overlayWidth = 900;
+  const overlayHeight = 320;
+
+  const gazeCanvasPoint = useMemo(() => {
+    if (!gazePoint) {
+      return { x: null, y: null };
+    }
+
+    if (session?.screen_w && session.screen_h) {
+      return {
+        x: (gazePoint.x / session.screen_w) * overlayWidth,
+        y: (gazePoint.y / session.screen_h) * overlayHeight,
+      };
+    }
+
+    const isNormalized = gazePoint.x >= 0 && gazePoint.x <= 1 && gazePoint.y >= 0 && gazePoint.y <= 1;
+    if (isNormalized) {
+      return {
+        x: gazePoint.x * overlayWidth,
+        y: gazePoint.y * overlayHeight,
+      };
+    }
+
+    return {
+      x: gazePoint.x,
+      y: gazePoint.y,
+    };
+  }, [gazePoint, session]);
+
+  const worldPointer = useMemo(() => {
+    if (gazePoint) {
+      if (session?.screen_w && session.screen_h) {
+        return {
+          x: clamp(gazePoint.x / session.screen_w, 0, 1),
+          y: clamp(gazePoint.y / session.screen_h, 0, 1),
+        };
+      }
+
+      if (gazePoint.x >= 0 && gazePoint.x <= 1 && gazePoint.y >= 0 && gazePoint.y <= 1) {
+        return {
+          x: clamp(gazePoint.x, 0, 1),
+          y: clamp(gazePoint.y, 0, 1),
+        };
+      }
+    }
+
+    return {
+      x: attentionState.rawX,
+      y: attentionState.rawY,
+    };
+  }, [attentionState.rawX, attentionState.rawY, gazePoint, session]);
+
   const faceXNorm = useMemo(() => {
     const value = faceMetrics?.features?.face_x_norm;
     return typeof value === "number" ? value : null;
   }, [faceMetrics?.features]);
+
   const faceYNorm = useMemo(() => {
     const value = faceMetrics?.features?.face_y_norm;
     return typeof value === "number" ? value : null;
@@ -212,12 +278,12 @@ export default function LivePage() {
   function resetNeutralPose() {
     if (!pose.faceDetected) {
       setNeutralPose(null);
-      setStatusMessage("Pose neutra limpa. Aguarde o rosto ser detectado para recalibrar automaticamente.");
+      setStatusMessage("Pose neutra limpa. Aguarde a face reaparecer para recalibrar.");
       return;
     }
 
     setNeutralPose({ yaw: pose.yaw, pitch: pose.pitch });
-    setStatusMessage("Pose neutra reajustada com base no frame atual.");
+    setStatusMessage("Pose neutra alinhada com o frame atual.");
   }
 
   async function handleRegisterDevice() {
@@ -228,13 +294,7 @@ export default function LivePage() {
       });
       setDeviceContext(created);
       const active = await attachActiveSessionForDevice(created.id);
-      if (active) {
-        setStatusMessage("Novo device registrado e sessão ativa vinculada.");
-      } else {
-        setStatusMessage(
-          "Novo device registrado. Atenção: isto cria outro DEVICE_ID/KEY; atualize o firmware se quiser usar este.",
-        );
-      }
+      setStatusMessage(active ? "Novo device criado e sessão ativa anexada." : "Novo device criado. Atualize o firmware se quiser usar esta chave.");
       await refreshHealth();
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Falha ao registrar dispositivo");
@@ -258,11 +318,7 @@ export default function LivePage() {
 
       setDeviceContext(existing);
       const active = await attachActiveSessionForDevice(existing.id);
-      if (active) {
-        setStatusMessage("Device existente vinculado e sessão ativa anexada.");
-      } else {
-        setStatusMessage("Device existente vinculado. Nenhuma sessão ativa encontrada para ele.");
-      }
+      setStatusMessage(active ? "Device conectado e sessão ativa anexada." : "Device conectado. Nenhuma sessão ativa encontrada.");
       await refreshHealth();
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Falha ao vincular device existente");
@@ -276,7 +332,7 @@ export default function LivePage() {
     setManualDeviceKey("");
     localStorage.removeItem(DEVICE_STORAGE_KEY);
     localStorage.removeItem(SESSION_STORAGE_KEY);
-    setStatusMessage("Contexto local removido (device/sessão).");
+    setStatusMessage("Contexto local removido.");
   }
 
   async function handleStartSession(mode: "mvp" | "calibration") {
@@ -321,7 +377,7 @@ export default function LivePage() {
 
       setSession(response.session);
       localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(response.session));
-      setStatusMessage("Quick start concluído: device registrado e sessão MVP iniciada.");
+      setStatusMessage("Quick start concluído.");
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Falha no quick start");
     }
@@ -350,11 +406,7 @@ export default function LivePage() {
 
     try {
       const active = await attachActiveSessionForDevice(device.id);
-      if (active) {
-        setStatusMessage("Sessão ativa vinculada ao dashboard.");
-        return;
-      }
-      setStatusMessage("Nenhuma sessão ativa encontrada.");
+      setStatusMessage(active ? "Sessão ativa sincronizada com o dashboard." : "Nenhuma sessão ativa encontrada.");
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Nenhuma sessão ativa encontrada");
     }
@@ -362,7 +414,7 @@ export default function LivePage() {
 
   async function handleOpenPage() {
     if (!session) {
-      setStatusMessage("Inicie uma sessão antes de abrir uma página.");
+      setStatusMessage("Inicie uma sessão antes de registrar uma página.");
       return;
     }
 
@@ -379,332 +431,392 @@ export default function LivePage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl border border-cyan-900/70 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),transparent_55%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.14),transparent_50%),linear-gradient(180deg,rgba(9,9,11,0.95),rgba(3,7,18,0.96))] p-5">
-        <p className="text-xs uppercase tracking-[0.24em] text-cyan-300/80">GazePilot Live Control</p>
-        <p className="mt-2 text-sm text-zinc-300">
-          Fluxo recomendado: <strong>Vincular Existente</strong> → <strong>Sincronizar Sessão Ativa</strong> →
-          monitorar preview e comandos.
-        </p>
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <div className="rounded-xl border border-zinc-800 bg-zinc-950/70 px-3 py-2">
-            <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">WebSocket</p>
-            <p className="mt-1 text-sm text-zinc-200">{wsStatus}</p>
+      <section className="relative overflow-hidden rounded-[36px] border border-white/10 bg-[linear-gradient(135deg,rgba(7,18,32,0.96),rgba(11,13,29,0.94)_48%,rgba(23,10,27,0.92))] px-5 py-6 shadow-[0_30px_90px_rgba(2,6,23,0.42)] md:px-7">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(103,232,249,0.16),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(244,114,182,0.14),transparent_26%)]" />
+        <div className="relative grid gap-6 xl:grid-cols-[1.4fr_0.9fr]">
+          <div>
+            <div className="flex flex-wrap gap-2">
+              <Pill icon={Wifi} label={`ws ${wsStatus}`} tone="cyan" />
+              <Pill icon={Camera} label={pose.faceDetected ? "face on" : "face off"} tone={pose.faceDetected ? "emerald" : "slate"} />
+              <Pill icon={Activity} label={`${health?.cv_backend_active ?? "cv"} mode`} tone="amber" />
+              <Pill icon={Sparkles} label={attentionState.eyeTrackingActive ? "iris live" : "fallback pose"} tone="pink" />
+            </div>
+
+            <h1 className="mt-5 max-w-3xl font-heading text-4xl leading-tight text-white md:text-5xl">
+              Um cockpit mais divertido para pilotar a navegação com o olhar.
+            </h1>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300">
+              O pipeline agora usa sinais reais de íris quando disponíveis, transforma isso em direção viva e já liga
+              esse input a um mundo interativo e a um mini game estilo arcade.
+            </p>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <ActionButton icon={Play} onClick={() => void handleQuickStart()} tone="cyan">
+                Quick Start
+              </ActionButton>
+              <ActionButton icon={RefreshCcw} onClick={() => void handleAttachActiveSession()} tone="emerald">
+                Sincronizar Sessão
+              </ActionButton>
+              <ActionButton icon={Sparkles} onClick={resetNeutralPose} tone="slate">
+                Recalibrar Pose
+              </ActionButton>
+            </div>
+
+            <div className="mt-6 grid gap-3 md:grid-cols-3">
+              <HeroStat
+                label="Intento ao vivo"
+                value={suggestedAction ?? "IDLE"}
+                hint={attentionState.source === "eye_gaze" ? "guiado pela íris" : "guiado pela pose"}
+              />
+              <HeroStat label="Frames" value={String(framesProcessed)} hint={session?.id ? "stream ativo" : "sem sessão"} />
+              <HeroStat
+                label="Tracking"
+                value={attentionState.direction === "center" ? "CENTRO" : attentionState.direction.toUpperCase()}
+                hint={attentionState.eyeTrackingActive ? "eye tracking real" : "fallback ativo"}
+              />
+            </div>
           </div>
-          <div className="rounded-xl border border-zinc-800 bg-zinc-950/70 px-3 py-2">
-            <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Sessão Atual</p>
-            <p className="mt-1 truncate text-sm text-zinc-200">{session?.id ?? "-"}</p>
-          </div>
-          <div className="rounded-xl border border-zinc-800 bg-zinc-950/70 px-3 py-2">
-            <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Backend CV</p>
-            <p className="mt-1 text-sm text-zinc-200">{health?.cv_backend_active ?? "-"}</p>
+
+          <div className="glass-panel rounded-[28px] p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.28em] text-white/45">Pulse dock</p>
+                <p className="mt-2 text-2xl font-semibold text-white">Status instantâneo</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-2 text-xs text-white/60">
+                {session ? "live session" : "awaiting session"}
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              <DockRow label="Device" value={device?.name ?? "não vinculado"} />
+              <DockRow label="Session" value={session?.id?.slice(0, 10) ?? "-"} />
+              <DockRow label="Backend" value={health?.cv_backend_active ?? "-"} />
+              <DockRow label="Último comando" value={commands[0]?.command ?? "nenhum"} />
+            </div>
+
+            {statusMessage ? (
+              <div className="mt-5 rounded-2xl border border-emerald-400/15 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
+                {statusMessage}
+              </div>
+            ) : null}
+
+            {health?.mediapipe_error ? (
+              <div className="mt-3 rounded-2xl border border-amber-400/15 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+                {health.mediapipe_error}
+              </div>
+            ) : null}
           </div>
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-3">
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-          <p className="text-xs uppercase tracking-[0.22em] text-zinc-500">Device</p>
-          <p className="mt-1 text-xs text-zinc-500">
-            Se o firmware já possui <code>DEVICE_ID/KEY</code>, use <code>Vincular Existente</code>.
-          </p>
+      <section className="grid gap-6 xl:grid-cols-[1.28fr_0.88fr]">
+        <div className="glass-panel rounded-[32px] p-5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.28em] text-white/45">Vision Deck</p>
+              <p className="mt-2 text-2xl font-semibold text-white">Preview + feedback em tempo real</p>
+            </div>
+            <div className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs text-white/60">
+              yaw {centeredYaw.toFixed(1)} / pitch {centeredPitch.toFixed(1)}
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            <PoseMeter label="Yaw" value={centeredYaw} threshold={YAW_THRESHOLD} />
+            <PoseMeter label="Pitch" value={centeredPitch} threshold={PITCH_THRESHOLD} />
+            <PoseMeter label="Roll" value={pose.roll} threshold={15} />
+          </div>
+
+          <div className="mt-5">
+            <LivePreview
+              sessionId={session?.id ?? null}
+              width={960}
+              height={540}
+              yaw={centeredYaw}
+              pitch={centeredPitch}
+              roll={pose.roll}
+              faceDetected={pose.faceDetected}
+              suggestedAction={suggestedAction}
+              attentionDirection={attentionState.direction}
+              attentionSource={attentionState.source}
+              gazeRawX={attentionState.rawX}
+              gazeRawY={attentionState.rawY}
+              faceXNorm={faceXNorm}
+              faceYNorm={faceYNorm}
+            />
+          </div>
+        </div>
+
+        <AttentionCompass
+          direction={attentionState.direction}
+          source={attentionState.source}
+          intensity={attentionState.intensity}
+          eyeTrackingActive={attentionState.eyeTrackingActive}
+          confidence={gazePoint?.confidence ?? pose.confidence ?? 0}
+        />
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
+        <GazeWorld
+          direction={attentionState.direction}
+          source={attentionState.source}
+          pointerX={worldPointer.x}
+          pointerY={worldPointer.y}
+          latestCommand={commands[0]?.command ?? null}
+          wsStatus={wsStatus}
+        />
+
+        <GazeArcade
+          direction={attentionState.direction}
+          source={attentionState.source}
+          signalStrength={attentionState.intensity}
+          active={pose.faceDetected}
+        />
+      </section>
+
+      <BlinkMemory
+        blinkCount={blinkCount}
+        lastBlinkAt={lastBlinkAt}
+        blinkActive={Boolean(faceMetrics?.blink)}
+        motionLatencyMs={lastFrame?.age_ms ?? null}
+        processingLatencyMs={lastFrame?.latency_ms ?? null}
+        framesProcessed={framesProcessed}
+      />
+
+      <section className="grid gap-6 xl:grid-cols-3">
+        <ControlPanel
+          icon={Camera}
+          eyebrow="Device Dock"
+          title="Pareamento"
+          body="Cole o device_key do hardware ou crie um novo registro."
+        >
           <input
             value={deviceName}
             onChange={(event) => setDeviceName(event.target.value)}
-            className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+            className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-300/60"
             placeholder="Nome do dispositivo"
           />
           <input
             value={manualDeviceId}
             onChange={(event) => setManualDeviceId(event.target.value)}
-            className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+            className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-300/60"
             placeholder="device_id (opcional)"
           />
           <input
             value={manualDeviceKey}
             onChange={(event) => setManualDeviceKey(event.target.value)}
-            className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+            className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-300/60"
             placeholder="device_key"
           />
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => void handleLinkExistingDevice()}
-              className="rounded-lg bg-cyan-600 px-3 py-2 text-sm font-medium text-cyan-50 hover:bg-cyan-500"
-            >
-              Vincular Existente
-            </button>
-            <button
-              type="button"
-              onClick={handleRegisterDevice}
-              className="rounded-lg border border-zinc-700 px-3 py-2 text-sm hover:border-emerald-400 hover:text-emerald-200"
-            >
-              Registrar Novo
-            </button>
+          <div className="flex flex-wrap gap-2">
+            <ActionButton icon={Wifi} onClick={() => void handleLinkExistingDevice()} tone="cyan">
+              Vincular
+            </ActionButton>
+            <ActionButton icon={Sparkles} onClick={handleRegisterDevice} tone="slate">
+              Registrar
+            </ActionButton>
+            <ActionButton icon={RefreshCcw} onClick={handleClearLocalContext} tone="slate">
+              Limpar
+            </ActionButton>
           </div>
-          <details className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950/50 p-2">
-            <summary className="cursor-pointer text-xs text-zinc-400">Ações avançadas</summary>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => void handleQuickStart()}
-                className="rounded-lg border border-zinc-700 px-3 py-2 text-xs hover:border-cyan-400 hover:text-cyan-200"
-              >
-                Quick Start
-              </button>
-              <button
-                type="button"
-                onClick={handleClearLocalContext}
-                className="rounded-lg border border-zinc-700 px-3 py-2 text-xs hover:border-rose-400 hover:text-rose-200"
-              >
-                Limpar Contexto
-              </button>
-            </div>
-          </details>
-        </div>
+        </ControlPanel>
 
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-          <p className="text-xs uppercase tracking-[0.22em] text-zinc-500">Sessão</p>
-          <p className="mt-1 text-xs text-zinc-500">
-            <code>Start Calibration</code> é opcional para refinar gaze; para comandos básicos não é obrigatório.
-          </p>
-          <p className="mt-1 text-xs text-zinc-500">
-            Ao iniciar nova sessão, o preview pode pausar por ~5s até a ESP32 reanexar automaticamente.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => void handleAttachActiveSession()}
-              className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-emerald-50 hover:bg-emerald-500"
-            >
-              Sincronizar Sessão Ativa
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleStartSession("mvp")}
-              className="rounded-lg border border-zinc-700 px-3 py-2 text-sm hover:border-cyan-400 hover:text-cyan-200"
-            >
-              Iniciar Sessão MVP
-            </button>
+        <ControlPanel
+          icon={Activity}
+          eyebrow="Session Engine"
+          title="Comandos e calibração"
+          body="Suba uma sessão live ou entre no modo de calibração quando quiser refinar o gaze."
+        >
+          <div className="grid gap-2 sm:grid-cols-2">
+            <ActionButton icon={Play} onClick={() => void handleStartSession("mvp")} tone="emerald">
+              Sessão MVP
+            </ActionButton>
+            <ActionButton icon={Sparkles} onClick={() => void handleStartSession("calibration")} tone="amber">
+              Calibration
+            </ActionButton>
           </div>
-          <details className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950/50 p-2">
-            <summary className="cursor-pointer text-xs text-zinc-400">Controles avançados de sessão</summary>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => void handleStartSession("calibration")}
-                className="rounded-lg border border-zinc-700 px-3 py-2 text-xs hover:border-amber-400 hover:text-amber-200"
-              >
-                Start Calibration
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleEndSession()}
-                className="rounded-lg border border-zinc-700 px-3 py-2 text-xs hover:border-rose-400 hover:text-rose-200"
-              >
-                End Session
-              </button>
-            </div>
-          </details>
-        </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <ActionButton icon={RefreshCcw} onClick={() => void handleAttachActiveSession()} tone="cyan">
+              Attach Active
+            </ActionButton>
+            <ActionButton icon={Activity} onClick={() => void handleEndSession()} tone="slate">
+              Encerrar
+            </ActionButton>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-white/70">
+            movimentos: direita/esquerda/cima/baixo. Quando a íris estiver disponível, o backend prioriza eye tracking
+            real; sem isso, cai para pose.
+          </div>
+        </ControlPanel>
 
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-          <p className="text-xs uppercase tracking-[0.22em] text-zinc-500">Página ativa (opcional)</p>
-          <p className="mt-1 text-xs text-zinc-500">
-            Use isso apenas para analytics/heatmap de página. Não é necessário para comandos.
-          </p>
+        <ControlPanel
+          icon={Globe}
+          eyebrow="Page Pulse"
+          title="Heatmap ativo"
+          body="Associe uma página para gravar o mapa de atenção da sessão."
+        >
           <input
             value={pageUrl}
             onChange={(event) => setPageUrl(event.target.value)}
-            className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+            className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-300/60"
             placeholder="https://..."
           />
-          <button
-            type="button"
-            onClick={() => void handleOpenPage()}
-            className="mt-3 rounded-lg border border-zinc-700 px-3 py-2 text-sm hover:border-cyan-400 hover:text-cyan-200"
-          >
+          <ActionButton icon={Globe} onClick={() => void handleOpenPage()} tone="cyan">
             Registrar Página
-          </button>
-        </div>
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-4">
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-          <p className="text-xs uppercase tracking-[0.22em] text-zinc-500">Backend</p>
-          <p className="mt-2 text-sm text-zinc-300">API: {health?.api ?? "-"}</p>
-          <p className="text-sm text-zinc-300">DB: {health?.database ?? "-"}</p>
-          <p className="text-sm text-zinc-300">Queue: {health?.queue_mode ?? "-"}</p>
-          <p className="text-sm text-zinc-300">CV ativo: {health?.cv_backend_active ?? "-"}</p>
-          <p className="text-sm text-zinc-300">
-            MediaPipe: {health?.mediapipe_available ? "loaded" : "fallback"}
-          </p>
-          {health?.mediapipe_error ? (
-            <p className="mt-1 text-xs text-amber-300">MediaPipe error: {health.mediapipe_error}</p>
-          ) : null}
-          {health?.cv_backend_active === "none" ? (
-            <p className="mt-2 text-xs text-rose-300">
-              CV inativo: sem detecção real. Confira container/backend e dependências do MediaPipe.
-            </p>
-          ) : null}
-        </div>
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-          <p className="text-xs uppercase tracking-[0.22em] text-zinc-500">Realtime</p>
-          <p className="mt-2 text-sm text-zinc-300">WS: {wsStatus}</p>
-          <p className="text-sm text-zinc-300">Frames: {framesProcessed}</p>
-          <p className="text-sm text-zinc-300">Pose backend: {pose.backend}</p>
-          <p className="text-sm text-zinc-300">Face detectada: {pose.faceDetected ? "sim" : "não"}</p>
-          <p className="text-sm text-zinc-300">Ação candidata: {candidateAction ?? "-"}</p>
-          <p className="text-sm text-zinc-300">Última ação: {commands[0]?.command ?? "-"}</p>
-          <p className="text-xs text-zinc-500">
-            yaw/pitch corrigidos: {centeredYaw.toFixed(1)} / {centeredPitch.toFixed(1)}
-          </p>
-          <button
-            type="button"
-            onClick={resetNeutralPose}
-            className="mt-2 rounded-lg border border-zinc-700 px-2 py-1 text-xs hover:border-cyan-400 hover:text-cyan-200"
-          >
-            Recalibrar Pose Neutra
-          </button>
-        </div>
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 md:col-span-2">
-          <p className="text-xs uppercase tracking-[0.22em] text-zinc-500">Contexto atual</p>
-          <p className="mt-2 text-sm text-zinc-300">Device ID: {device?.id ?? "-"}</p>
-          <p className="text-sm text-zinc-300">Device Key: {device?.device_key ?? "-"}</p>
-          <p className="text-sm text-zinc-300">Session ID: {session?.id ?? "-"}</p>
-          {statusMessage ? <p className="mt-2 text-sm text-emerald-300">{statusMessage}</p> : null}
-        </div>
-      </section>
-
-      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-        <p className="text-sm font-semibold text-zinc-200">Guia rápido (2 minutos)</p>
-        <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-zinc-400">
-          <li>Em Device, use Vincular Existente com o device_key do ESP32.</li>
-          <li>Na seção Sessão, clique em Sincronizar Sessão Ativa.</li>
-          <li>Confirme WS conectado e Frames aumentando no painel Realtime.</li>
-          <li>No Preview, centralize o rosto e clique Recalibrar Pose Neutra se o pitch estiver enviesado.</li>
-          <li>Mova a cabeça por ~0.4s para direita/esquerda/cima/baixo e verifique o Command Log.</li>
-        </ol>
-      </section>
-
-      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-        <p className="text-sm font-semibold text-zinc-200">Como o reconhecimento funciona</p>
-        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-400">
-          <li>
-            A ESP32-CAM <strong>não</strong> classifica ações localmente; ela só envia frames JPEG.
-          </li>
-          <li>
-            Comandos são inferidos por <strong>movimento da cabeça</strong> (yaw/pitch), não por olhar isolado.
-          </li>
-          <li>
-            <code>Yaw</code>: rotação horizontal da cabeça (direita positivo, esquerda negativo).
-          </li>
-          <li>
-            <code>Pitch</code>: rotação vertical (cima positivo, baixo negativo).
-          </li>
-          <li>
-            <code>Roll</code>: inclinação lateral da cabeça (apoio visual, não dispara comandos).
-          </li>
-          <li>
-            <code>Gaze Overlay</code>: projeção estimada do ponto de atenção na tela.
-          </li>
-          <li>
-            Olhos/íris contribuem para o ponto de gaze, mas a ação (<code>NEXT/PREV/SCROLL</code>) vem da pose da cabeça.
-          </li>
-        </ul>
-        <div className="mt-3 grid gap-2 md:grid-cols-2">
-          {RECOGNIZED_SIGNALS.map((signal) => (
-            <div key={signal.name} className="rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2">
-              <p className="text-xs font-semibold text-zinc-300">{signal.name}</p>
-              <p className="text-xs text-zinc-500">{signal.meaning}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-        <p className="text-sm font-semibold text-zinc-200">Ações detectáveis</p>
-        <div className="mt-3 grid gap-3 md:grid-cols-2">
-          {SUPPORTED_ACTIONS.map((item) => (
-            <div key={item.command} className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-3">
-              <p className="text-sm font-semibold text-emerald-300">{item.command}</p>
-              <p className="mt-1 text-xs text-zinc-400">{item.movement}</p>
-              <p className="mt-1 text-xs text-zinc-500">{item.trigger}</p>
-            </div>
-          ))}
-        </div>
-        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-zinc-400">
-          <li>Teste rápido: mantenha cada movimento por ~0.4s.</li>
-          <li>Evite movimentos muito curtos; existe suavização e cooldown.</li>
-        </ul>
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-[2fr_1fr] lg:grid-rows-[auto_auto]">
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 lg:row-start-1">
-          <p className="mb-3 text-sm font-semibold text-zinc-200">Preview da ESP32-CAM</p>
-          <div className="mb-3 grid gap-3 md:grid-cols-3">
-            <PoseMeter label="Yaw" value={centeredYaw} threshold={YAW_THRESHOLD} />
-            <PoseMeter label="Pitch" value={centeredPitch} threshold={PITCH_THRESHOLD} />
-            <PoseMeter label="Roll" value={pose.roll} threshold={15} />
+          </ActionButton>
+          <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-white/70">
+            session {session?.id?.slice(0, 10) ?? "--"} • source {gazePoint?.source ?? attentionState.source}
           </div>
-          <LivePreview
-            sessionId={session?.id ?? null}
-            width={960}
-            height={540}
-            yaw={centeredYaw}
-            pitch={centeredPitch}
-            roll={pose.roll}
-            faceDetected={pose.faceDetected}
-            suggestedAction={candidateAction}
-            faceXNorm={faceXNorm}
-            faceYNorm={faceYNorm}
-          />
+        </ControlPanel>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
+        <div className="glass-panel rounded-[32px] p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.28em] text-white/45">Signal Trail</p>
+              <p className="mt-2 text-2xl font-semibold text-white">Mapa vivo do gaze</p>
+            </div>
+            <div className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs text-white/60">
+              {gazePoint?.source ?? "raw"}
+            </div>
+          </div>
+          <div className="mt-5">
+            <GazeOverlay
+              width={overlayWidth}
+              height={overlayHeight}
+              x={gazeCanvasPoint.x}
+              y={gazeCanvasPoint.y}
+              confidence={gazePoint?.confidence ?? 0}
+            />
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 lg:row-start-2">
-          <p className="mb-3 text-sm font-semibold text-zinc-200">Gaze Overlay</p>
-          <GazeOverlay
-            width={overlayWidth}
-            height={overlayHeight}
-            x={gazeCanvasPoint.x}
-            y={gazeCanvasPoint.y}
-            confidence={gazePoint?.confidence ?? 0}
-          />
-        </div>
-
-        <div className="flex min-h-0 flex-col rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 lg:row-span-2">
-          <p className="mb-3 text-sm font-semibold text-zinc-200">Command Log</p>
-          <p className="mb-3 text-xs text-zinc-500">Histórico de comandos disparados durante a sessão ativa.</p>
-          <div className="min-h-0 flex-1">
+        <div className="glass-panel flex min-h-[420px] flex-col rounded-[32px] p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.28em] text-white/45">Command Stream</p>
+              <p className="mt-2 text-2xl font-semibold text-white">Histórico de ações</p>
+            </div>
+            <div className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs text-white/60">
+              {commands.length} eventos
+            </div>
+          </div>
+          <div className="mt-5 min-h-0 flex-1">
             <CommandLog commands={commands} />
           </div>
         </div>
       </section>
+    </div>
+  );
+}
 
-      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-        <p className="mb-2 text-sm font-semibold text-zinc-200">Checklist ESP32-CAM (físico)</p>
-        <ul className="list-disc space-y-1 pl-5 text-sm text-zinc-400">
-          <li>Use rede Wi-Fi 2.4GHz (ESP32-CAM não conecta em 5GHz).</li>
-          <li>
-            <code>API_BASE_URL</code> deve apontar para IP local da máquina backend (ex.:{" "}
-            <code>192.168.x.x:8000</code>).
-          </li>
-          <li>
-            Após upload, remova jumper <code>IO0 -&gt; GND</code> e aperte <code>RST</code> para
-            boot normal.
-          </li>
-          <li>
-            No serial, confirme <code>[wifi] connected</code>, <code>[session] id=...</code>,{" "}
-            <code>[frame] status=202</code>.
-          </li>
-          <li>
-            Se clicar em <code>Registrar Novo Device</code>, o backend gera um novo <code>device_id/device_key</code>.
-          </li>
-          <li>
-            Se frames = 0 por mais de 20s, clique em <code>Attach Active</code> para sincronizar sessão.
-          </li>
-          <li>Se persistir, revise rede/firewall/porta serial e reinicie sessão.</li>
-        </ul>
-      </section>
+function ActionButton({
+  children,
+  icon: Icon,
+  onClick,
+  tone,
+}: {
+  children: ReactNode;
+  icon: ComponentType<{ className?: string }>;
+  onClick: () => void;
+  tone: "cyan" | "emerald" | "amber" | "slate";
+}) {
+  const toneClass =
+    tone === "cyan"
+      ? "border-cyan-300/20 bg-cyan-300/12 text-cyan-50 hover:bg-cyan-300/18"
+      : tone === "emerald"
+        ? "border-emerald-300/20 bg-emerald-300/12 text-emerald-50 hover:bg-emerald-300/18"
+        : tone === "amber"
+          ? "border-amber-300/20 bg-amber-300/12 text-amber-50 hover:bg-amber-300/18"
+          : "border-white/10 bg-white/[0.05] text-white hover:bg-white/[0.08]";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-medium transition ${toneClass}`}
+    >
+      <Icon className="h-4 w-4" />
+      <span>{children}</span>
+    </button>
+  );
+}
+
+function Pill({
+  icon: Icon,
+  label,
+  tone,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  tone: "cyan" | "emerald" | "amber" | "pink" | "slate";
+}) {
+  const toneClass =
+    tone === "cyan"
+      ? "border-cyan-300/20 bg-cyan-300/10 text-cyan-100"
+      : tone === "emerald"
+        ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-100"
+        : tone === "amber"
+          ? "border-amber-300/20 bg-amber-300/10 text-amber-100"
+          : tone === "pink"
+            ? "border-pink-300/20 bg-pink-300/10 text-pink-100"
+            : "border-white/10 bg-white/[0.05] text-white/70";
+
+  return (
+    <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs uppercase tracking-[0.2em] ${toneClass}`}>
+      <Icon className="h-3.5 w-3.5" />
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function HeroStat({ label, value, hint }: { label: string; value: string; hint: string }) {
+  return (
+    <div className="rounded-[28px] border border-white/10 bg-white/[0.05] px-4 py-4">
+      <p className="text-xs uppercase tracking-[0.24em] text-white/45">{label}</p>
+      <p className="mt-3 text-3xl font-semibold text-white">{value}</p>
+      <p className="mt-1 text-sm text-white/55">{hint}</p>
+    </div>
+  );
+}
+
+function DockRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3">
+      <span className="text-xs uppercase tracking-[0.24em] text-white/45">{label}</span>
+      <span className="max-w-[60%] truncate text-right text-sm text-white">{value}</span>
+    </div>
+  );
+}
+
+function ControlPanel({
+  icon: Icon,
+  eyebrow,
+  title,
+  body,
+  children,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  eyebrow: string;
+  title: string;
+  body: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="glass-panel rounded-[30px] p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.28em] text-white/45">{eyebrow}</p>
+          <p className="mt-2 text-2xl font-semibold text-white">{title}</p>
+          <p className="mt-2 text-sm leading-6 text-white/60">{body}</p>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3 text-white/75">
+          <Icon className="h-5 w-5" />
+        </div>
+      </div>
+      <div className="mt-5 space-y-3">{children}</div>
     </div>
   );
 }

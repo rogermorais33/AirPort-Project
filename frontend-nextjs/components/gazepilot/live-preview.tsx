@@ -11,6 +11,10 @@ interface LivePreviewProps {
   roll: number;
   faceDetected: boolean;
   suggestedAction: string | null;
+  attentionDirection: "left" | "right" | "up" | "down" | "center";
+  attentionSource: "eye_gaze" | "head_pose" | "idle";
+  gazeRawX?: number | null;
+  gazeRawY?: number | null;
   faceXNorm?: number | null;
   faceYNorm?: number | null;
 }
@@ -24,6 +28,10 @@ export function LivePreview({
   roll,
   faceDetected,
   suggestedAction,
+  attentionDirection,
+  attentionSource,
+  gazeRawX,
+  gazeRawY,
   faceXNorm,
   faceYNorm,
 }: LivePreviewProps) {
@@ -34,6 +42,10 @@ export function LivePreview({
     roll,
     faceDetected,
     suggestedAction,
+    attentionDirection,
+    attentionSource,
+    gazeRawX: gazeRawX ?? null,
+    gazeRawY: gazeRawY ?? null,
     faceXNorm: faceXNorm ?? null,
     faceYNorm: faceYNorm ?? null,
   });
@@ -61,10 +73,14 @@ export function LivePreview({
       roll,
       faceDetected,
       suggestedAction,
+      attentionDirection,
+      attentionSource,
+      gazeRawX: gazeRawX ?? null,
+      gazeRawY: gazeRawY ?? null,
       faceXNorm: faceXNorm ?? null,
       faceYNorm: faceYNorm ?? null,
     };
-  }, [faceDetected, faceXNorm, faceYNorm, pitch, roll, suggestedAction, yaw]);
+  }, [attentionDirection, attentionSource, faceDetected, faceXNorm, faceYNorm, gazeRawX, gazeRawY, pitch, roll, suggestedAction, yaw]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -118,6 +134,13 @@ export function LivePreview({
       const textWidth = ctx.measureText(actionText).width;
       ctx.fillStyle = metrics.suggestedAction ? "#34d399" : "#a1a1aa";
       ctx.fillText(actionText, Math.max(12, width - textWidth - 12), 24);
+
+      const trackingText =
+        metrics.attentionSource === "eye_gaze"
+          ? `eye tracking ${metrics.attentionDirection}`
+          : `fallback ${metrics.attentionDirection}`;
+      ctx.fillStyle = "#7dd3fc";
+      ctx.fillText(trackingText, 12, height - 18);
     };
 
     const drawFaceMarker = () => {
@@ -145,6 +168,28 @@ export function LivePreview({
       ctx.stroke();
     };
 
+    const drawAttentionMarker = () => {
+      const metrics = metricsRef.current;
+      if (typeof metrics.gazeRawX !== "number" || typeof metrics.gazeRawY !== "number") {
+        return;
+      }
+
+      const px = Math.max(24, Math.min(width - 24, metrics.gazeRawX * width));
+      const py = Math.max(24, Math.min(height - 24, metrics.gazeRawY * height));
+
+      ctx.strokeStyle = "rgba(125, 211, 252, 0.95)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(px, py, 12, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(px - 18, py);
+      ctx.lineTo(px + 18, py);
+      ctx.moveTo(px, py - 18);
+      ctx.lineTo(px, py + 18);
+      ctx.stroke();
+    };
+
     const drawFrame = (img: HTMLImageElement) => {
       ctx.clearRect(0, 0, width, height);
       ctx.fillStyle = "#09090b";
@@ -159,6 +204,7 @@ export function LivePreview({
 
       drawHud();
       drawFaceMarker();
+      drawAttentionMarker();
     };
 
     const tick = async () => {

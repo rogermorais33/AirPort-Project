@@ -100,6 +100,7 @@ export interface CommandEvent {
   trigger: string;
   confidence: number;
   cooldown_ms: number;
+  source?: string;
   meta_json?: Record<string, unknown>;
 }
 
@@ -124,6 +125,15 @@ export interface GazePointEvent {
   confidence: number;
   source: string;
   page_id?: string | null;
+}
+
+export interface FrameProcessedEvent {
+  frame_event_id: string;
+  session_id: string;
+  status: string;
+  latency_ms?: number | null;
+  age_ms?: number | null;
+  face_detected?: boolean;
 }
 
 export interface WsEnvelope<T = Record<string, unknown>> {
