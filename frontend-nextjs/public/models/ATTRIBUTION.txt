@@ -1,0 +1,24 @@
+GazePilot world assets
+
+skyport-map.glb
+Source: SpectraStudios / SourceCityToolkit_glb
+URL: https://github.com/SpectraStudios/SourceCityToolkit_glb
+License: CC0-1.0
+Note: The repository README declares exceptions for models using Textures.com photographs. Provenance of the textures used by this specific GLB was not individually documented in the repo.
+
+skyport-market.glb
+Source: SpectraStudios / SourceCityToolkit_glb
+URL: https://github.com/SpectraStudios/SourceCityToolkit_glb
+License: CC0-1.0
+Note: The repository README declares exceptions for models using Textures.com photographs. Provenance of the textures used by this specific GLB was not individually documented in the repo.
+
+skyport-apartments.glb
+Source: SpectraStudios / SourceCityToolkit_glb
+URL: https://github.com/SpectraStudios/SourceCityToolkit_glb
+License: CC0-1.0
+Note: The repository README declares exceptions for models using Textures.com photographs. Provenance of the textures used by this specific GLB was not individually documented in the repo.
+
+avatar.glb
+Source: Quaternius / Hoodie Character via Poly Pizza
+URL: https://poly.pizza/m/gKLBoRsyKe
+License: CC0

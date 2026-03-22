@@ -38,13 +38,50 @@
   body {
     font-family: var(--font-body), ui-sans-serif;
     background:
-      radial-gradient(circle at 85% 8%, rgba(16, 185, 129, 0.15), transparent 30%),
-      radial-gradient(circle at 5% 82%, rgba(245, 158, 11, 0.12), transparent 30%),
-      linear-gradient(135deg, #050507 0%, #0c0d12 50%, #11111a 100%);
+      radial-gradient(circle at 12% 14%, rgba(34, 211, 238, 0.14), transparent 25%),
+      radial-gradient(circle at 82% 8%, rgba(244, 114, 182, 0.12), transparent 24%),
+      radial-gradient(circle at 72% 78%, rgba(16, 185, 129, 0.14), transparent 28%),
+      linear-gradient(145deg, #030712 0%, #08111f 46%, #140b1d 100%);
     background-attachment: fixed;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    background-size: 80px 80px;
+    mask-image: radial-gradient(circle at center, black, transparent 88%);
+    opacity: 0.18;
+  }
+
+  body::after {
+    content: "";
+    position: fixed;
+    inset: auto -10% -30% auto;
+    width: 28rem;
+    height: 28rem;
+    border-radius: 9999px;
+    background: radial-gradient(circle, rgba(103, 232, 249, 0.12), transparent 68%);
+    filter: blur(16px);
+    pointer-events: none;
   }
 
   .font-heading {
     font-family: var(--font-heading), ui-sans-serif;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.68), rgba(2, 6, 23, 0.58));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 20px 60px rgba(2, 6, 23, 0.25);
+    backdrop-filter: blur(18px);
   }
 }
