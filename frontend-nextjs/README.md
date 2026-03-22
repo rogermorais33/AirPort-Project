@@ -5,6 +5,7 @@ Dashboard Next.js para monitoramento live de pose/gaze, calibração e relatóri
 ## Rotas
 
 - `/live`: painel principal de operação (preview da ESP32-CAM, yaw/pitch/roll, status da sessão e command log).
+- `/world`: mundo 3D com free roam por teclado, distritos interativos e tracking contextual (`Browser Cam` ou `ESP32 / Backend`).
 - `/calibration`: wizard de 5/9 pontos com treino de regressão linear.
 - `/sessions`: listagem de sessões.
 - `/sessions/[id]`: relatório da sessão (summary + heatmap + timeline + commands).
@@ -48,6 +49,11 @@ npm run dev
 
 Abrir: `http://localhost:3000`
 
+Rotas de uso:
+
+- `http://localhost:3000/live`
+- `http://localhost:3000/world`
+
 ## Integração API
 
 A UI usa proxy interno em `app/api/proxy/[...path]/route.ts` para chamadas REST.
@@ -76,6 +82,30 @@ Observação de troca de sessão:
 npm run lint
 npm run build
 ```
+
+## Browser Cam no `/world`
+
+O modo `Browser Cam` usa `getUserMedia` no navegador e Face Landmarker local no browser.
+
+Fluxo esperado:
+
+- selecione `Browser Cam`
+- permita o uso da webcam
+- navegue pelo mundo com `WASD/setas`
+- use o `Vision Dock` para ver o preview local da câmera
+- use `Retry Cam` se a webcam falhar ao inicializar
+
+Observações:
+
+- o preview da webcam aparece no `Vision Dock`; isso não significa que o tracking está desligado nos outros distritos
+- a Browser Cam exige `localhost` ou `HTTPS`
+- se outro app estiver usando a webcam, o navegador pode liberar a permissão mas ainda assim falhar ao abrir o stream
+
+Erros comuns:
+
+- `Permissao da camera negada`: reabra a permissão do site no navegador
+- `A camera ja esta em uso por outro app`: feche Zoom, Meet, Discord, OBS ou a câmera do sistema
+- `Nenhuma camera foi encontrada`: o navegador não encontrou webcam disponível
 
 ## Deploy no Render
 

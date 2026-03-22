@@ -40,6 +40,11 @@ npm run dev
 
 Frontend em `http://localhost:3000`.
 
+Rotas úteis:
+
+- `http://localhost:3000/live`
+- `http://localhost:3000/world`
+
 Opcional (backend local sem Docker):
 
 ```bash
@@ -123,6 +128,44 @@ make firmware-monitor PORT=COM5
    - `[wifi] connected`
    - `[session] ...`
    - `[frame] status=202`
+
+## Browser Cam no `/world`
+
+O mundo 3D aceita dois modos de tracking:
+
+- `Browser Cam`: webcam local do notebook, melhor para fluidez
+- `ESP32 / Backend`: prova de conceito do pipeline embarcado
+
+No `/world`, a locomoção continua sendo por teclado:
+
+- `WASD` ou setas para andar
+- `Shift` para sprint
+- `1 / 2 / 3` para trocar ação contextual
+- `Enter` para confirmar
+
+O eye tracking entra como camada contextual perto dos distritos. O preview ao vivo da webcam aparece no distrito `Vision Dock`.
+
+### Troubleshooting da Browser Cam
+
+Se você liberar a câmera e ela ainda não aparecer:
+
+1. Verifique se o site está em `localhost` ou `HTTPS`.
+2. Feche outros apps que podem estar usando a webcam:
+   - Zoom
+   - Meet
+   - Discord
+   - OBS
+   - câmera do Windows
+3. No `/world`, troque para `Browser Cam` e, se necessário, clique em `Retry Cam`.
+4. Vá até o `Vision Dock` para ver o preview local da webcam.
+5. Se a permissão já tinha sido negada antes, reabra a permissão do site no navegador.
+
+Causas comuns:
+
+- permissão negada no navegador
+- webcam ocupada por outro app
+- página fora de `localhost/HTTPS`
+- navegador sem suporte correto a `getUserMedia`
 
 ## Docs
 
