@@ -44,6 +44,17 @@ class CVResult:
     backend: str
 
 
+@dataclass(slots=True)
+class RawGazeEstimate:
+    x_norm: float
+    y_norm: float
+    iris_available: bool
+    left_h_ratio: float | None = None
+    right_h_ratio: float | None = None
+    left_v_ratio: float | None = None
+    right_v_ratio: float | None = None
+
+
 class CVPipeline:
     def __init__(self) -> None:
         self._backend_requested = settings.cv_backend.lower().strip()
@@ -164,7 +175,7 @@ class CVPipeline:
 
         blink = _detect_blink_ear(landmarks)
 
-        raw_gaze_norm = _estimate_gaze_from_iris_or_pose(landmarks, yaw=yaw, pitch=pitch)
+        raw_gaze = _estimate_gaze_from_iris_or_pose(landmarks, yaw=yaw, pitch=pitch)
 
         confidence = 0.62
         if pnp_ok:
@@ -180,8 +191,18 @@ class CVPipeline:
             pitch=float(_clamp(pitch, -35.0, 35.0)),
             roll=float(_clamp(roll, -25.0, 25.0)),
             blink=blink,
-            eye_left={"x": float(_clamp(eye_left[0], 0.0, 1.0)), "y": float(_clamp(eye_left[1], 0.0, 1.0))},
-            eye_right={"x": float(_clamp(eye_right[0], 0.0, 1.0)), "y": float(_clamp(eye_right[1], 0.0, 1.0))},
+            eye_left={
+                "x": float(_clamp(eye_left[0], 0.0, 1.0)),
+                "y": float(_clamp(eye_left[1], 0.0, 1.0)),
+                "iris_ratio_x": float(raw_gaze.left_h_ratio) if raw_gaze.left_h_ratio is not None else None,
+                "iris_ratio_y": float(raw_gaze.left_v_ratio) if raw_gaze.left_v_ratio is not None else None,
+            },
+            eye_right={
+                "x": float(_clamp(eye_right[0], 0.0, 1.0)),
+                "y": float(_clamp(eye_right[1], 0.0, 1.0)),
+                "iris_ratio_x": float(raw_gaze.right_h_ratio) if raw_gaze.right_h_ratio is not None else None,
+                "iris_ratio_y": float(raw_gaze.right_v_ratio) if raw_gaze.right_v_ratio is not None else None,
+            },
             features={
                 "face_x_norm": face_x_norm,
                 "face_y_norm": face_y_norm,
@@ -189,8 +210,11 @@ class CVPipeline:
                 "pitch": float(pitch),
                 "roll": float(roll),
                 "blink": 1.0 if blink else 0.0,
+                "gaze_raw_x_norm": float(raw_gaze.x_norm),
+                "gaze_raw_y_norm": float(raw_gaze.y_norm),
+                "iris_available": 1.0 if raw_gaze.iris_available else 0.0,
             },
-            raw_gaze_norm=raw_gaze_norm,
+            raw_gaze_norm=(raw_gaze.x_norm, raw_gaze.y_norm),
             backend="mediapipe",
         )
 
@@ -282,6 +306,9 @@ class CVPipeline:
                 "pitch": float(pitch),
                 "roll": float(roll),
                 "blink": 1.0 if blink else 0.0,
+                "gaze_raw_x_norm": float(raw_gaze_x),
+                "gaze_raw_y_norm": float(raw_gaze_y),
+                "iris_available": 0.0,
             },
             raw_gaze_norm=(raw_gaze_x, raw_gaze_y),
             backend="opencv",
@@ -305,6 +332,9 @@ class CVPipeline:
                 "pitch": 0.0,
                 "roll": 0.0,
                 "blink": 0.0,
+                "gaze_raw_x_norm": 0.5,
+                "gaze_raw_y_norm": 0.5,
+                "iris_available": 0.0,
             },
             raw_gaze_norm=(0.5, 0.5),
             backend=backend,
@@ -425,7 +455,7 @@ def _estimate_gaze_from_iris_or_pose(
     *,
     yaw: float,
     pitch: float,
-) -> tuple[float, float]:
+) -> RawGazeEstimate:
     has_iris = len(landmarks) > 473
     if has_iris:
         left_inner = _lm_norm(landmarks, 133)
@@ -446,11 +476,21 @@ def _estimate_gaze_from_iris_or_pose(
         left_v = _ratio(left_iris[1], min(left_top[1], left_bottom[1]), max(left_top[1], left_bottom[1]))
         right_v = _ratio(right_iris[1], min(right_top[1], right_bottom[1]), max(right_top[1], right_bottom[1]))
 
-        return float(_clamp((left_h + right_h) / 2.0, 0.0, 1.0)), float(
-            _clamp((left_v + right_v) / 2.0, 0.0, 1.0)
+        return RawGazeEstimate(
+            x_norm=float(_clamp((left_h + right_h) / 2.0, 0.0, 1.0)),
+            y_norm=float(_clamp((left_v + right_v) / 2.0, 0.0, 1.0)),
+            iris_available=True,
+            left_h_ratio=float(left_h),
+            right_h_ratio=float(right_h),
+            left_v_ratio=float(left_v),
+            right_v_ratio=float(right_v),
         )
 
-    return float(_clamp(0.5 + yaw / 65.0, 0.0, 1.0)), float(_clamp(0.5 - pitch / 50.0, 0.0, 1.0))
+    return RawGazeEstimate(
+        x_norm=float(_clamp(0.5 + yaw / 65.0, 0.0, 1.0)),
+        y_norm=float(_clamp(0.5 - pitch / 50.0, 0.0, 1.0)),
+        iris_available=False,
+    )
 
 
 def _estimate_roll(gray: Any, x: int, y: int, fw: int, fh: int) -> float:

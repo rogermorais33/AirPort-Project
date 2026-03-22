@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     frame_queue_mode: str = "memory"  # sync | memory | redis
     frame_queue_maxsize: int = 256
-    frame_max_fps: float = 8.0
+    frame_max_fps: float = 10.0
     frame_max_bytes: int = 350_000
 
     redis_url: str = "redis://localhost:6379/0"
@@ -29,9 +29,11 @@ class Settings(BaseSettings):
 
     yaw_threshold_deg: float = 20.0
     pitch_threshold_deg: float = 15.0
+    gaze_horizontal_threshold_norm: float = Field(default=0.14, ge=0.04, le=0.4)
+    gaze_vertical_threshold_norm: float = Field(default=0.12, ge=0.04, le=0.4)
 
-    default_stream_fps: int = 6
-    default_jpeg_quality: int = 10
+    default_stream_fps: int = 10
+    default_jpeg_quality: int = 14
     default_resolution: str = "QVGA"
 
     cv_backend: str = "auto"  # auto | mediapipe | opencv

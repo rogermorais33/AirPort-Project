@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import Select, desc, select
@@ -109,6 +109,9 @@ class FramePipelineService:
                     ts=frame_event.ts,
                     yaw=cv_result.yaw,
                     pitch=cv_result.pitch,
+                    gaze_x_norm=float(cv_result.features.get("gaze_raw_x_norm", cv_result.raw_gaze_norm[0])),
+                    gaze_y_norm=float(cv_result.features.get("gaze_raw_y_norm", cv_result.raw_gaze_norm[1])),
+                    eye_tracking_available=bool(cv_result.features.get("iris_available", 0.0) >= 0.5),
                 )
                 for decision in decisions:
                     command = Command(
@@ -122,6 +125,9 @@ class FramePipelineService:
                             "yaw": round(cv_result.yaw, 3),
                             "pitch": round(cv_result.pitch, 3),
                             "roll": round(cv_result.roll, 3),
+                            "source": decision.source,
+                            "gaze_raw_x_norm": round(float(cv_result.features.get("gaze_raw_x_norm", 0.5)), 4),
+                            "gaze_raw_y_norm": round(float(cv_result.features.get("gaze_raw_y_norm", 0.5)), 4),
                         },
                     )
                     db.add(command)
@@ -132,6 +138,7 @@ class FramePipelineService:
                             "trigger": decision.trigger,
                             "confidence": decision.confidence,
                             "cooldown_ms": decision.cooldown_ms,
+                            "source": decision.source,
                         }
                     )
 
@@ -144,6 +151,7 @@ class FramePipelineService:
                 "session_id": str(session.id),
                 "status": frame_event.processing_status,
                 "latency_ms": frame_event.latency_ms,
+                "age_ms": _frame_age_ms(frame_event.ts),
                 "face_detected": cv_result.face_detected,
             }
 
@@ -211,6 +219,7 @@ class FramePipelineService:
                     "session_id": str(frame_event.session_id),
                     "status": "error",
                     "detail": detail,
+                    "age_ms": _frame_age_ms(frame_event.ts),
                 },
                 session_id=frame_event.session_id,
             )
@@ -241,10 +250,44 @@ def latest_features_for_session(session_id: UUID) -> dict[str, float] | None:
             "yaw": float(metric.yaw or 0.0),
             "pitch": float(metric.pitch or 0.0),
             "roll": float(metric.roll or 0.0),
+            "gaze_raw_x_norm": _stored_gaze_metric(metric, axis="x", yaw=float(metric.yaw or 0.0), pitch=float(metric.pitch or 0.0)),
+            "gaze_raw_y_norm": _stored_gaze_metric(metric, axis="y", yaw=float(metric.yaw or 0.0), pitch=float(metric.pitch or 0.0)),
+            "iris_available": 1.0 if _metric_has_iris(metric) else 0.0,
             "timestamp": frame_event.ts.timestamp(),
         }
     finally:
         db.close()
+
+
+def _metric_has_iris(metric: FaceMetric) -> bool:
+    left = metric.eye_left_json or {}
+    right = metric.eye_right_json or {}
+    return left.get("iris_ratio_x") is not None and right.get("iris_ratio_x") is not None
+
+
+def _stored_gaze_metric(metric: FaceMetric, *, axis: str, yaw: float, pitch: float) -> float:
+    left = metric.eye_left_json or {}
+    right = metric.eye_right_json or {}
+    key = "iris_ratio_x" if axis == "x" else "iris_ratio_y"
+    left_value = left.get(key)
+    right_value = right.get(key)
+
+    if left_value is not None and right_value is not None:
+        return float((float(left_value) + float(right_value)) / 2.0)
+
+    if axis == "x":
+        return float(max(0.0, min(1.0, 0.5 + yaw / 65.0)))
+    return float(max(0.0, min(1.0, 0.5 - pitch / 50.0)))
+
+
+def _frame_age_ms(frame_ts: datetime) -> float | None:
+    if frame_ts.tzinfo is None:
+        frame_ts = frame_ts.replace(tzinfo=timezone.utc)
+
+    age_ms = (datetime.now(timezone.utc) - frame_ts).total_seconds() * 1000.0
+    if age_ms < 0:
+        return 0.0
+    return round(age_ms, 2)
 
 
 def _active_page_stmt(session_id: UUID) -> Select[tuple[Page]]:

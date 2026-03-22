@@ -89,6 +89,7 @@ async def ingest_frame(
                 "session_id": str(session.id),
                 "status": "throttled",
                 "latency_ms": None,
+                "age_ms": max(0.0, round((datetime.now(timezone.utc) - frame_ts).total_seconds() * 1000.0, 2)),
             },
             session_id=session.id,
         )

@@ -4,21 +4,31 @@ from typing import Any
 
 import numpy as np
 
-FEATURE_ORDER = ["bias", "face_x_norm", "face_y_norm", "yaw", "pitch", "roll"]
+FEATURE_ORDER = ["bias", "face_x_norm", "face_y_norm", "yaw", "pitch", "roll", "gaze_raw_x_norm", "gaze_raw_y_norm"]
+
+
+def feature_vector_for_order(features: dict[str, float], feature_order: list[str]) -> np.ndarray:
+    values: list[float] = []
+    for name in feature_order:
+        if name == "bias":
+            values.append(1.0)
+        else:
+            values.append(float(features.get(name, 0.0)))
+    return np.array(values, dtype=float)
 
 
 def feature_vector(features: dict[str, float]) -> np.ndarray:
-    return np.array(
-        [
-            1.0,
-            float(features.get("face_x_norm", 0.5)),
-            float(features.get("face_y_norm", 0.5)),
-            float(features.get("yaw", 0.0)),
-            float(features.get("pitch", 0.0)),
-            float(features.get("roll", 0.0)),
-        ],
-        dtype=float,
-    )
+    defaults = {
+        "face_x_norm": 0.5,
+        "face_y_norm": 0.5,
+        "yaw": 0.0,
+        "pitch": 0.0,
+        "roll": 0.0,
+        "gaze_raw_x_norm": 0.5,
+        "gaze_raw_y_norm": 0.5,
+    }
+    normalized = {**defaults, **features}
+    return feature_vector_for_order(normalized, FEATURE_ORDER)
 
 
 def train_linear_model(points: list[dict[str, Any]]) -> tuple[dict[str, Any], float]:
@@ -38,7 +48,10 @@ def train_linear_model(points: list[dict[str, Any]]) -> tuple[dict[str, Any], fl
     x = np.vstack(x_rows)
     y = np.array(y_targets)
 
-    coef, _, _, _ = np.linalg.lstsq(x, y, rcond=None)
+    ridge_lambda = 1e-3
+    regularizer = ridge_lambda * np.eye(x.shape[1], dtype=float)
+    regularizer[0, 0] = 0.0
+    coef = np.linalg.solve(x.T @ x + regularizer, x.T @ y)
     predictions = x @ coef
     mae = float(np.mean(np.abs(predictions - y)))
 
@@ -66,7 +79,19 @@ def predict_gaze(
 
     if profile_params and profile_params.get("coefficients"):
         coef = np.array(profile_params["coefficients"], dtype=float)
-        vec = feature_vector(features)
+        feature_order = list(profile_params.get("feature_order") or FEATURE_ORDER)
+        vec = feature_vector_for_order(
+            {
+                "face_x_norm": float(features.get("face_x_norm", 0.5)),
+                "face_y_norm": float(features.get("face_y_norm", 0.5)),
+                "yaw": float(features.get("yaw", 0.0)),
+                "pitch": float(features.get("pitch", 0.0)),
+                "roll": float(features.get("roll", 0.0)),
+                "gaze_raw_x_norm": float(features.get("gaze_raw_x_norm", raw_guess_norm[0])),
+                "gaze_raw_y_norm": float(features.get("gaze_raw_y_norm", raw_guess_norm[1])),
+            },
+            feature_order,
+        )
         pred = vec @ coef
         gx_norm = float(np.clip(pred[0], 0.0, 1.0))
         gy_norm = float(np.clip(pred[1], 0.0, 1.0))
