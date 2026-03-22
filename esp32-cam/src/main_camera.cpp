@@ -32,9 +32,10 @@
 String g_device_id = DEVICE_ID;
 String g_device_key = DEVICE_KEY;
 String g_session_id = "";
-int g_fps = 6;
-int g_jpeg_quality = 10;
+int g_fps = 10;
+int g_jpeg_quality = 14;
 bool g_camera_ready = false;
+std::vector<uint8_t> g_upload_buffer;
 
 unsigned long g_last_frame_ms = 0;
 unsigned long g_last_heartbeat_ms = 0;
@@ -147,9 +148,9 @@ bool initCamera() {
   config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
 
   if (has_psram) {
-    config.frame_size = FRAMESIZE_SVGA;
+    config.frame_size = FRAMESIZE_QVGA;
     config.jpeg_quality = g_jpeg_quality;
-    config.fb_count = 2;
+    config.fb_count = 3;
     config.fb_location = CAMERA_FB_IN_PSRAM;
     config.grab_mode = CAMERA_GRAB_LATEST;
   } else {
@@ -175,6 +176,9 @@ bool initCamera() {
   if (sensor != nullptr) {
     sensor->set_framesize(sensor, FRAMESIZE_QVGA);
     sensor->set_quality(sensor, g_jpeg_quality);
+    sensor->set_brightness(sensor, 0);
+    sensor->set_contrast(sensor, 1);
+    sensor->set_saturation(sensor, 0);
   }
 
   Serial.println("[camera] initialized");
@@ -393,15 +397,15 @@ bool sendFrame() {
   const String body_tail = "\r\n--" + boundary + "--\r\n";
 
   const size_t total_size = body_head.length() + fb->len + body_tail.length();
-  std::vector<uint8_t> payload;
-  payload.resize(total_size);
+  g_upload_buffer.clear();
+  g_upload_buffer.resize(total_size);
 
   size_t offset = 0;
-  memcpy(payload.data() + offset, body_head.c_str(), body_head.length());
+  memcpy(g_upload_buffer.data() + offset, body_head.c_str(), body_head.length());
   offset += body_head.length();
-  memcpy(payload.data() + offset, fb->buf, fb->len);
+  memcpy(g_upload_buffer.data() + offset, fb->buf, fb->len);
   offset += fb->len;
-  memcpy(payload.data() + offset, body_tail.c_str(), body_tail.length());
+  memcpy(g_upload_buffer.data() + offset, body_tail.c_str(), body_tail.length());
 
   HTTPClient http;
   const String url = String(API_BASE_URL) + "/api/v1/frames";
@@ -412,16 +416,19 @@ bool sendFrame() {
     return false;
   }
 
+  http.setReuse(true);
+  http.setConnectTimeout(2500);
+  http.setTimeout(3500);
   http.addHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
   http.addHeader("X-Device-Key", g_device_key);
 
-  int status = http.POST(payload.data(), payload.size());
+  int status = http.POST(g_upload_buffer.data(), g_upload_buffer.size());
   String response = http.getString();
   http.end();
 
   esp_camera_fb_return(fb);
 
-  Serial.printf("[frame] status=%d size=%u\n", status, (unsigned int)payload.size());
+  Serial.printf("[frame] status=%d size=%u fps=%d quality=%d\n", status, (unsigned int)g_upload_buffer.size(), g_fps, g_jpeg_quality);
   if (status < 200 || status >= 300) {
     if (status == 401) {
       Serial.println("[frame] auth failed, resetting device credentials");
