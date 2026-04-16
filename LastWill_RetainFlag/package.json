@@ -1,0 +1,18 @@
+{
+  "name": "mqtt-last-will-retain-flag",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Demonstracao de MQTT Last Will and Testament e Retain Flag.",
+  "scripts": {
+    "broker": "podman run --name mqtt-lastwill-mosquitto --replace -d -p 1883:1883 docker.io/library/eclipse-mosquitto:2 mosquitto -c /mosquitto-no-auth.conf",
+    "broker:logs": "podman logs -f mqtt-lastwill-mosquitto",
+    "broker:stop": "podman stop mqtt-lastwill-mosquitto",
+    "pub": "node pubSensores.js",
+    "sub": "node subSensores.js",
+    "check": "node --check pubSensores.js && node --check subSensores.js"
+  },
+  "dependencies": {
+    "mqtt": "^5.0.0"
+  }
+}

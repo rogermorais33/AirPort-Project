@@ -9,6 +9,7 @@ Monorepo do projeto **GazePilot — ESP32-CAM Gaze/Head Tracking + Heatmap + Han
 - `esp32-cam/`: firmware ESP32-CAM (PlatformIO) para captura JPEG e envio de frames.
 - `browser-extension/`: bridge opcional para executar comandos no navegador via WS.
 - `docs/`: arquitetura, API, firmware, calibração e privacidade.
+- `LastWill_RetainFlag/`: atividade MQTT demonstrando Last Will and Testament e Retain Flag.
 - `Relatório do Projeto.md`: relatório acadêmico atualizado.
 - `Edge Computing.md`: estratégia de edge híbrido.
 
@@ -182,3 +183,4 @@ Causas comuns:
 - [Frontend Next.js](frontend-nextjs/README.md)
 - [Firmware ESP32-CAM](esp32-cam/README.md)
 - [Browser Extension](browser-extension/README.md)
+- [Atividade MQTT: Last Will e Retain Flag](LastWill_RetainFlag/README.md)
