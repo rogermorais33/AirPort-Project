@@ -5,14 +5,25 @@
   "type": "module",
   "description": "Demonstracao de MQTT Last Will and Testament e Retain Flag.",
   "scripts": {
-    "broker": "podman run --name mqtt-lastwill-mosquitto --replace -d -p 1883:1883 docker.io/library/eclipse-mosquitto:2 mosquitto -c /mosquitto-no-auth.conf",
-    "broker:logs": "podman logs -f mqtt-lastwill-mosquitto",
-    "broker:stop": "podman stop mqtt-lastwill-mosquitto",
+    "broker": "node broker.js",
+    "broker:node": "node broker.js",
+    "broker:docker": "docker run --name mqtt-lastwill-mosquitto --rm -p 1883:1883 eclipse-mosquitto:2 mosquitto -c /mosquitto-no-auth.conf",
+    "broker:docker:detached": "docker run --name mqtt-lastwill-mosquitto --rm -d -p 1883:1883 eclipse-mosquitto:2 mosquitto -c /mosquitto-no-auth.conf",
+    "broker:docker:logs": "docker logs -f mqtt-lastwill-mosquitto",
+    "broker:docker:stop": "docker rm -f mqtt-lastwill-mosquitto",
+    "broker:podman": "podman run --name mqtt-lastwill-mosquitto --replace --rm -p 1883:1883 docker.io/library/eclipse-mosquitto:2 mosquitto -c /mosquitto-no-auth.conf",
+    "broker:podman:detached": "podman run --name mqtt-lastwill-mosquitto --replace --rm -d -p 1883:1883 docker.io/library/eclipse-mosquitto:2 mosquitto -c /mosquitto-no-auth.conf",
+    "broker:podman:logs": "podman logs -f mqtt-lastwill-mosquitto",
+    "broker:podman:stop": "podman rm -f mqtt-lastwill-mosquitto",
     "pub": "node pubSensores.js",
     "sub": "node subSensores.js",
-    "check": "node --check pubSensores.js && node --check subSensores.js"
+    "check": "node --check broker.js && node --check validate-lwt-retain.js && node --check pubSensores.js && node --check subSensores.js",
+    "validate": "node validate-lwt-retain.js",
+    "test": "npm run check && npm run validate"
   },
   "dependencies": {
+    "aedes": "^0.51.3",
+    "dotenv": "^17.4.2",
     "mqtt": "^5.0.0"
   }
 }

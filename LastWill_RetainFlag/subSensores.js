@@ -1,8 +1,17 @@
+import "dotenv/config";
 import mqtt from "mqtt";
 import readline from "readline";
 
-const BROKER_URL = process.env.MQTT_BROKER_URL ?? "mqtt://localhost:1883";
+const BROKER_URL = process.env.MQTT_BROKER_URL ?? "mqtt://127.0.0.1:1883";
 const LWT_BASE_TOPIC = "aula/lwt-retain/aeroporto/terminal-a";
+
+function parseBooleanEnv(value, defaultValue) {
+    if (value === undefined) {
+        return defaultValue;
+    }
+
+    return ["1", "true", "sim", "yes", "on"].includes(value.toLowerCase());
+}
 
 function qos0() {
     const client = mqtt.connect(BROKER_URL);
@@ -71,13 +80,19 @@ function qos2() {
 }
 
 function lastWillRetainFlag() {
+    const clean = parseBooleanEnv(process.env.MQTT_SUB_CLEAN ?? process.env.MQTT_CLEAN, true);
+    const clientId = process.env.MQTT_SUB_CLIENT_ID ?? `sub-lwt-retain-${process.pid}`;
+
     const client = mqtt.connect(BROKER_URL, {
-        clientId: `sub-lwt-retain-${process.pid}`,
-        clean: true
+        clientId,
+        clean
     });
 
-    client.on("connect", () => {
+    client.on("connect", (connack) => {
         console.log("SUB Last Will + Retain Flag: conectado");
+        console.log(`ClientId: ${clientId}`);
+        console.log(`Clean session: ${clean}`);
+        console.log(`Sessao recuperada pelo broker: ${connack.sessionPresent}`);
         console.log(`Inscrevendo em ${LWT_BASE_TOPIC}/#`);
         console.log("Mensagens com retain=true chegaram do historico guardado no broker.\n");
 

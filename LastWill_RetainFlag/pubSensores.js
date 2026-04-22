@@ -1,7 +1,8 @@
+import "dotenv/config";
 import mqtt from "mqtt";
 import readline from "readline";
 
-const BROKER_URL = process.env.MQTT_BROKER_URL ?? "mqtt://localhost:1883";
+const BROKER_URL = process.env.MQTT_BROKER_URL ?? "mqtt://127.0.0.1:1883";
 const LWT_BASE_TOPIC = "aula/lwt-retain/aeroporto/terminal-a";
 const LWT_TOPICS = {
     status: `${LWT_BASE_TOPIC}/status`,
@@ -21,6 +22,14 @@ const tempo_envio_incendio = Math.random() * 500;
 
 function agora() {
     return new Date().toISOString();
+}
+
+function parseBooleanEnv(value, defaultValue) {
+    if (value === undefined) {
+        return defaultValue;
+    }
+
+    return ["1", "true", "sim", "yes", "on"].includes(value.toLowerCase());
 }
 
 function publicarJson(client, topic, payload, options = {}) {
@@ -122,10 +131,12 @@ function qos2() {
 
 function lastWillRetainFlag() {
     const sensorId = "terminal-a";
-    const clientId = `pub-${sensorId}-${process.pid}`;
+    const clean = parseBooleanEnv(process.env.MQTT_PUB_CLEAN ?? process.env.MQTT_CLEAN, true);
+    const clientId = process.env.MQTT_PUB_CLIENT_ID ?? `pub-${sensorId}-${process.pid}`;
 
     const client = mqtt.connect(BROKER_URL, {
         clientId,
+        clean,
         keepalive: 5,
         reconnectPeriod: 0,
         will: {
@@ -258,6 +269,7 @@ function lastWillRetainFlag() {
     client.on("connect", () => {
         console.log("PUB Last Will + Retain Flag: conectado");
         console.log(`ClientId: ${clientId}`);
+        console.log(`Clean session: ${clean}`);
         console.log(`PID para teste com kill -9: ${process.pid}`);
         console.log("Use Ctrl+C para desligamento controlado.");
         console.log("Use kill -9 <PID> ou derrube a conexao para o broker disparar o Last Will.\n");
