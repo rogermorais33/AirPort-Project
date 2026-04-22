@@ -1,1 +1,4 @@
 CameraWebServer/
+node_modules/
+.env
+frontend-nextjs/test-results/.last-run.json
