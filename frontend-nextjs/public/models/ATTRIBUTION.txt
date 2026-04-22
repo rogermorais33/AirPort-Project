@@ -1,5 +1,79 @@
 GazePilot world assets
 
+Active world environment assets
+
+road-roundabout.glb
+road-side.glb
+road-straight.glb
+light-square.glb
+sign-highway-wide.glb
+detail-awning-wide.glb
+building-a.glb
+building-h.glb
+building-m.glb
+building-skyscraper-b.glb
+building-skyscraper-d.glb
+low-detail-building-wide-a.glb
+low-detail-building-wide-b.glb
+Source: Kenney / City Kit Roads and City Kit Commercial
+URL: https://kenney.nl/assets/city-kit-roads
+URL: https://kenney.nl/assets/city-kit-commercial
+License: Creative Commons CC0
+Note: These assets are currently used by the /world scene for roads, venue shells, skyline, props and district entrances.
+
+building-type-a.glb
+building-type-d.glb
+building-type-h.glb
+building-type-m.glb
+building-type-r.glb
+tree-large.glb
+tree-small.glb
+path-long.glb
+path-short.glb
+path-stones-long.glb
+path-stones-short.glb
+driveway-long.glb
+driveway-short.glb
+planter.glb
+fence-low.glb
+Source: Kenney / City Kit Suburban
+URL: https://kenney.nl/assets/city-kit-suburban
+License: Creative Commons CC0
+Note: These assets are currently used by the /world scene for suburban blocks, trees, pedestrian paths, driveways and green details.
+
+sedan.glb
+taxi.glb
+suv.glb
+van.glb
+police.glb
+ambulance.glb
+cone.glb
+Source: Kenney / Car Kit
+URL: https://kenney.nl/assets/car-kit
+License: Creative Commons CC0
+Note: These assets are currently used by the /world scene for parked vehicles and small street props.
+
+character-e.glb
+Source: Kenney / Blocky Characters
+URL: https://kenney.nl/assets/blocky-characters
+License: Creative Commons CC0
+Note: This asset is used as the active player avatar and lightweight NPCs in the redesigned /world town scene.
+
+building-sample-house-a.glb
+building-sample-house-b.glb
+building-sample-house-c.glb
+building-sample-tower-a.glb
+building-sample-tower-b.glb
+building-sample-tower-c.glb
+building-sample-tower-d.glb
+Textures/colormap.png
+Source: Kenney / Modular Buildings
+URL: https://kenney.nl/assets/modular-buildings
+License: Creative Commons CC0
+Note: These assets are currently used by the /world scene as secondary residential blocks and side scenery.
+
+Legacy assets kept in the repository but no longer used by the current /world scene
+
 skyport-map.glb
 Source: SpectraStudios / SourceCityToolkit_glb
 URL: https://github.com/SpectraStudios/SourceCityToolkit_glb
@@ -22,3 +96,9 @@ avatar.glb
 Source: Quaternius / Hoodie Character via Poly Pizza
 URL: https://poly.pizza/m/gKLBoRsyKe
 License: CC0
+Note: This asset remains in the repository for possible future use, but is not the active player in the current /world build.
+
+Current /world player
+Source: Kenney / Blocky Characters (character-e.glb)
+License: Creative Commons CC0
+Note: The active player avatar is integrated with idle/walk/run states and keyboard-first locomotion.
