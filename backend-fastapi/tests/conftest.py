@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 
 import pytest
@@ -22,8 +23,26 @@ def setup_test_env() -> None:
 
     yield
 
+    try:
+        from sqlalchemy.orm import close_all_sessions
+
+        from app.db.session import engine
+
+        close_all_sessions()
+        engine.dispose()
+    except Exception:
+        # Best effort cleanup for test environment teardown.
+        pass
+
     if TEST_DB_PATH.exists():
-        TEST_DB_PATH.unlink()
+        for _ in range(10):
+            try:
+                TEST_DB_PATH.unlink()
+                break
+            except PermissionError:
+                time.sleep(0.2)
+        else:
+            raise PermissionError(f"Could not remove locked SQLite file: {TEST_DB_PATH}")
 
 
 @pytest.fixture()
@@ -31,6 +50,7 @@ def client(setup_test_env) -> TestClient:
     from app.db.base import Base
     from app.db.session import engine
     from app.main import app
+    from sqlalchemy.orm import close_all_sessions
 
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
@@ -38,4 +58,5 @@ def client(setup_test_env) -> TestClient:
     with TestClient(app) as test_client:
         yield test_client
 
+    close_all_sessions()
     Base.metadata.drop_all(bind=engine)
