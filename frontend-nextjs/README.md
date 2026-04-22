@@ -4,8 +4,9 @@ Dashboard Next.js para monitoramento live de pose/gaze, calibração e relatóri
 
 ## Rotas
 
+- `/`: landing page do produto, com entrada para mundo, live e calibration.
 - `/live`: painel principal de operação (preview da ESP32-CAM, yaw/pitch/roll, status da sessão e command log).
-- `/world`: mundo 3D com free roam por teclado, distritos interativos e tracking contextual (`Browser Cam` ou `ESP32 / Backend`).
+- `/world`: mundo 3D explorável por teclado, com lugares interativos que você abre e usa com `Browser Cam` ou `ESP32 / Backend` quando quiser.
 - `/calibration`: wizard de 5/9 pontos com treino de regressão linear.
 - `/sessions`: listagem de sessões.
 - `/sessions/[id]`: relatório da sessão (summary + heatmap + timeline + commands).
@@ -51,6 +52,7 @@ Abrir: `http://localhost:3000`
 
 Rotas de uso:
 
+- `http://localhost:3000/`
 - `http://localhost:3000/live`
 - `http://localhost:3000/world`
 
@@ -89,7 +91,10 @@ O modo `Browser Cam` usa `getUserMedia` no navegador e Face Landmarker local no 
 
 Fluxo esperado:
 
-- selecione `Browser Cam`
+- entre no `/world`
+- caminhe normalmente sem câmera se quiser
+- aproxime de um lugar ou abra um dos lugares pelo painel
+- selecione `Browser Cam` quando quiser ativar tracking local
 - permita o uso da webcam
 - navegue pelo mundo com `WASD/setas`
 - use o `Vision Dock` para ver o preview local da câmera
@@ -97,9 +102,12 @@ Fluxo esperado:
 
 Observações:
 
-- o preview da webcam aparece no `Vision Dock`; isso não significa que o tracking está desligado nos outros distritos
+- o mundo abre em modo manual (`Sem Camera`) por padrão
+- o preview da webcam aparece no `Vision Dock`; isso não significa que o tracking está desligado nos outros lugares
 - a Browser Cam exige `localhost` ou `HTTPS`
 - se outro app estiver usando a webcam, o navegador pode liberar a permissão mas ainda assim falhar ao abrir o stream
+- o player ativo do `/world` usa um personagem GLB CC0 do kit `Blocky Characters` da Kenney
+- o cenário do `/world` combina assets GLB CC0 da Kenney para ruas, skyline, bairros, árvores, carros, venues e props
 
 Erros comuns:
 

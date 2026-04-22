@@ -3,7 +3,7 @@
 import { Bloom, EffectComposer, Noise, Vignette } from "@react-three/postprocessing";
 import { CapsuleCollider, CuboidCollider, Physics, RigidBody, type RapierRigidBody } from "@react-three/rapier";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Float, Html, Sparkles } from "@react-three/drei";
+import { Float, Html, Sky, Sparkles } from "@react-three/drei";
 import type { MutableRefObject } from "react";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
@@ -12,25 +12,16 @@ import { SkyportAvatar } from "@/components/world/skyport-avatar";
 import { SkyportGltfEnvironment } from "@/components/world/skyport-gltf-environment";
 import { SkyportLoadingOverlay } from "@/components/world/skyport-loading-overlay";
 import { useSkyportWorldStore } from "@/components/world/use-skyport-world-store";
-import type { AttentionSource } from "@/lib/gaze";
-import { getDistrictActionByIndex, getDistrictById, SKYPORT_DISTRICTS, type DistrictActionId } from "@/lib/world-data";
-import { cn } from "@/lib/utils";
+import { getDistrictById, SKYPORT_DISTRICTS } from "@/lib/world-data";
 
 interface SkyportWorldSceneProps {
-  trackingMode: "remote" | "local";
-  attentionSource: AttentionSource;
-  attentionIntensity: number;
-  attentionRawX: number;
-  attentionRawY: number;
-  eyeTrackingActive: boolean;
+  trackingMode: "off" | "remote" | "local";
   blinkPulse: number;
   motionLatencyMs: number | null;
   openDistrictId: string | null;
-  onCommitInteraction: (payload: {
+  onEnterDistrict: (payload: {
     districtId: string;
-    actionId: DistrictActionId;
-    actionLabel: string;
-    source: "blink" | "keyboard";
+    source: "blink" | "keyboard" | "click";
   }) => void;
 }
 
@@ -42,17 +33,17 @@ interface KeyboardState {
   sprint: boolean;
 }
 
+const PLAYER_SPAWN: [number, number, number] = [0, 1, 8];
+const INITIAL_PLAYER_HEADING = Math.PI;
+const INITIAL_CAMERA_POSITION: [number, number, number] = [6.8, 6.4, 15.6];
+const INITIAL_CAMERA_LOOK_AT: [number, number, number] = [0, 1.35, 7.2];
+
 export function SkyportWorldScene({
   trackingMode,
-  attentionSource,
-  attentionIntensity,
-  attentionRawX,
-  attentionRawY,
-  eyeTrackingActive,
   blinkPulse,
   motionLatencyMs,
   openDistrictId,
-  onCommitInteraction,
+  onEnterDistrict,
 }: SkyportWorldSceneProps) {
   const keyStateRef = useRef<KeyboardState>({
     forward: false,
@@ -62,27 +53,30 @@ export function SkyportWorldScene({
     sprint: false,
   });
   const lastBlinkPulseRef = useRef(blinkPulse);
-  const setSelectedActionIndex = useSkyportWorldStore((state) => state.setSelectedActionIndex);
-  const selectedActionIndex = useSkyportWorldStore((state) => state.selectedActionIndex);
   const nearDistrictId = useSkyportWorldStore((state) => state.nearDistrictId);
   const introReady = useSkyportWorldStore((state) => state.introReady);
+  const setIntroReady = useSkyportWorldStore((state) => state.setIntroReady);
   const [worldReady, setWorldReady] = useState(false);
 
-  const commitCurrentInteraction = useCallback(
-    (source: "blink" | "keyboard") => {
-      const action = getDistrictActionByIndex(nearDistrictId, selectedActionIndex);
-      if (!nearDistrictId || !action) {
+  const enterCurrentDistrict = useCallback(
+    (source: "blink" | "keyboard" | "click") => {
+      if (!nearDistrictId) {
         return;
       }
-      onCommitInteraction({
+      onEnterDistrict({
         districtId: nearDistrictId,
-        actionId: action.id,
-        actionLabel: action.label,
         source,
       });
     },
-    [nearDistrictId, onCommitInteraction, selectedActionIndex],
+    [nearDistrictId, onEnterDistrict],
   );
+
+  useEffect(() => {
+    setIntroReady(false);
+    return () => {
+      setIntroReady(false);
+    };
+  }, [setIntroReady]);
 
   useEffect(() => {
     const id = window.setTimeout(() => {
@@ -94,71 +88,105 @@ export function SkyportWorldScene({
   }, []);
 
   useEffect(() => {
+    function isEditableTarget(target: EventTarget | null) {
+      if (!(target instanceof HTMLElement)) {
+        return false;
+      }
+      const tag = target.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable;
+    }
+
+    function resetKeys() {
+      keyStateRef.current.forward = false;
+      keyStateRef.current.back = false;
+      keyStateRef.current.left = false;
+      keyStateRef.current.right = false;
+      keyStateRef.current.sprint = false;
+    }
+
     function onKeyDown(event: KeyboardEvent) {
-      const key = event.key.toLowerCase();
-      if (key === "w" || key === "arrowup") {
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+
+      const code = event.code;
+      const isMoveKey =
+        code === "KeyW" ||
+        code === "KeyA" ||
+        code === "KeyS" ||
+        code === "KeyD" ||
+        code === "ArrowUp" ||
+        code === "ArrowDown" ||
+        code === "ArrowLeft" ||
+        code === "ArrowRight" ||
+        code === "ShiftLeft" ||
+        code === "ShiftRight" ||
+        code === "Enter" ||
+        code === "Space";
+
+      if (isMoveKey) {
+        event.preventDefault();
+      }
+
+      if (code === "KeyW" || code === "ArrowUp") {
         keyStateRef.current.forward = true;
-      } else if (key === "s" || key === "arrowdown") {
+      } else if (code === "KeyS" || code === "ArrowDown") {
         keyStateRef.current.back = true;
-      } else if (key === "a" || key === "arrowleft") {
+      } else if (code === "KeyA" || code === "ArrowLeft") {
         keyStateRef.current.left = true;
-      } else if (key === "d" || key === "arrowright") {
+      } else if (code === "KeyD" || code === "ArrowRight") {
         keyStateRef.current.right = true;
-      } else if (key === "shift") {
+      } else if (code === "ShiftLeft" || code === "ShiftRight") {
         keyStateRef.current.sprint = true;
-      } else if (key === "1") {
-        setSelectedActionIndex(0, "keyboard");
-      } else if (key === "2") {
-        setSelectedActionIndex(1, "keyboard");
-      } else if (key === "3") {
-        setSelectedActionIndex(2, "keyboard");
-      } else if ((event.key === "Enter" || event.key === " ") && nearDistrictId) {
-        commitCurrentInteraction("keyboard");
+      } else if ((code === "Enter" || code === "Space") && nearDistrictId) {
+        enterCurrentDistrict("keyboard");
       }
     }
 
     function onKeyUp(event: KeyboardEvent) {
-      const key = event.key.toLowerCase();
-      if (key === "w" || key === "arrowup") {
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+
+      const code = event.code;
+      const isMoveKey =
+        code === "KeyW" ||
+        code === "KeyA" ||
+        code === "KeyS" ||
+        code === "KeyD" ||
+        code === "ArrowUp" ||
+        code === "ArrowDown" ||
+        code === "ArrowLeft" ||
+        code === "ArrowRight" ||
+        code === "ShiftLeft" ||
+        code === "ShiftRight";
+
+      if (isMoveKey) {
+        event.preventDefault();
+      }
+
+      if (code === "KeyW" || code === "ArrowUp") {
         keyStateRef.current.forward = false;
-      } else if (key === "s" || key === "arrowdown") {
+      } else if (code === "KeyS" || code === "ArrowDown") {
         keyStateRef.current.back = false;
-      } else if (key === "a" || key === "arrowleft") {
+      } else if (code === "KeyA" || code === "ArrowLeft") {
         keyStateRef.current.left = false;
-      } else if (key === "d" || key === "arrowright") {
+      } else if (code === "KeyD" || code === "ArrowRight") {
         keyStateRef.current.right = false;
-      } else if (key === "shift") {
+      } else if (code === "ShiftLeft" || code === "ShiftRight") {
         keyStateRef.current.sprint = false;
       }
     }
 
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("keydown", onKeyDown, { passive: false });
+    window.addEventListener("keyup", onKeyUp, { passive: false });
+    window.addEventListener("blur", resetKeys);
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", resetKeys);
     };
-  }, [commitCurrentInteraction, nearDistrictId, setSelectedActionIndex]);
-
-  useEffect(() => {
-    if (!nearDistrictId) {
-      return;
-    }
-
-    const sourceActive = eyeTrackingActive || (attentionSource !== "idle" && attentionIntensity > 0.16);
-    if (!sourceActive) {
-      return;
-    }
-
-    let nextIndex = 1;
-    if (attentionRawX < 0.38) {
-      nextIndex = 0;
-    } else if (attentionRawX > 0.62) {
-      nextIndex = 2;
-    }
-
-    setSelectedActionIndex(nextIndex, "eye");
-  }, [attentionIntensity, attentionRawX, attentionSource, eyeTrackingActive, nearDistrictId, setSelectedActionIndex]);
+  }, [enterCurrentDistrict, nearDistrictId]);
 
   useEffect(() => {
     if (blinkPulse <= lastBlinkPulseRef.current) {
@@ -168,73 +196,67 @@ export function SkyportWorldScene({
     if (!introReady || !nearDistrictId) {
       return;
     }
-    commitCurrentInteraction("blink");
-  }, [blinkPulse, commitCurrentInteraction, introReady, nearDistrictId]);
+    enterCurrentDistrict("blink");
+  }, [blinkPulse, enterCurrentDistrict, introReady, nearDistrictId]);
 
   const activeDistrict = getDistrictById(nearDistrictId);
-  const activeAction = getDistrictActionByIndex(nearDistrictId, selectedActionIndex);
 
   return (
-    <div className="relative overflow-hidden rounded-[36px] border border-white/10 bg-[linear-gradient(145deg,rgba(2,6,23,0.96),rgba(10,12,32,0.93))] shadow-[0_30px_90px_rgba(2,6,23,0.5)]">
-      <Canvas camera={{ position: [0, 9, 22], fov: 42 }} shadows dpr={[1, 1.5]}>
+    <div className="relative h-[72vh] min-h-[560px] overflow-hidden rounded-[36px] border border-white/10 bg-[linear-gradient(145deg,rgba(6,23,45,0.96),rgba(8,18,32,0.93))] shadow-[0_30px_90px_rgba(2,6,23,0.5)] md:h-[84vh] md:min-h-[760px]">
+      <Canvas
+        className="h-full w-full"
+        camera={{ position: INITIAL_CAMERA_POSITION, fov: 50 }}
+        shadows={{ type: THREE.PCFShadowMap }}
+        gl={{ antialias: true, powerPreference: "high-performance" }}
+        dpr={[1, 1.8]}
+      >
         <SkyportSceneRoot
           keyStateRef={keyStateRef}
           openDistrictId={openDistrictId}
           trackingMode={trackingMode}
-          attentionRawY={attentionRawY}
           motionLatencyMs={motionLatencyMs}
+          onSelectDistrict={(districtId) => {
+            onEnterDistrict({
+              districtId,
+              source: "click",
+            });
+          }}
         />
       </Canvas>
 
       <SkyportLoadingOverlay trackingMode={trackingMode} worldReady={worldReady} />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between gap-3 p-4">
-        <ScenePill label="Mode" value="free roam" />
-        <ScenePill label="Input" value={trackingMode === "local" ? "browser cam" : "esp32 relay"} />
+        <ScenePill label="Mode" value="town square" />
+        <ScenePill
+          label="Input"
+          value={trackingMode === "local" ? "browser cam" : trackingMode === "remote" ? "esp32 relay" : "keyboard only"}
+        />
         <ScenePill label="Motion" value={motionLatencyMs === null ? "--" : `${Math.round(motionLatencyMs)} ms`} />
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 p-4">
-        <div className="mx-auto max-w-4xl rounded-[28px] border border-white/10 bg-slate-950/62 px-4 py-4 shadow-[0_20px_50px_rgba(2,6,23,0.35)] backdrop-blur-xl">
+      <div className="pointer-events-none absolute left-4 top-16">
+        <div className="max-w-sm rounded-[24px] border border-white/10 bg-slate-950/52 px-4 py-3 shadow-[0_20px_50px_rgba(2,6,23,0.35)] backdrop-blur-xl">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               <p className="text-[11px] uppercase tracking-[0.28em] text-white/42">
-                {activeDistrict ? activeDistrict.signLabel : "Skyport promenade"}
+                {activeDistrict ? activeDistrict.signLabel : "Skyport district"}
               </p>
-              <p className="mt-2 text-2xl font-semibold text-white">{activeDistrict?.title ?? "Walk the district lanes"}</p>
+              <p className="mt-2 text-lg font-semibold text-white">{activeDistrict?.title ?? "Explore central town"}</p>
               <p className="mt-2 text-sm text-white/58">
-                {activeDistrict?.ambientLabel ?? "Use WASD/setas para andar. Aproximar abre as opcoes contextuais."}
+                {activeDistrict?.subtitle ?? "Use WASD/setas para andar. Chegue perto de um lugar e pressione Enter para entrar."}
               </p>
             </div>
 
             <div className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-2 text-xs uppercase tracking-[0.22em] text-white/68">
-              {activeAction ? `selected ${activeAction.label}` : "no district nearby"}
+              {activeDistrict ? "enter venue" : "roaming"}
             </div>
           </div>
 
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            {(activeDistrict?.actions ?? FALLBACK_ACTIONS).map((action, index) => (
-              <div
-                key={action.id}
-                className={cn(
-                  "rounded-[22px] border px-4 py-3 transition-all",
-                  activeAction?.id === action.id
-                    ? "border-cyan-300/35 bg-cyan-300/12 text-cyan-50 shadow-[0_0_28px_rgba(34,211,238,0.16)]"
-                    : "border-white/10 bg-white/[0.04] text-white/72",
-                )}
-              >
-                <p className="text-[11px] uppercase tracking-[0.24em] text-white/45">slot 0{index + 1}</p>
-                <p className="mt-2 text-sm font-semibold">{action.label}</p>
-                <p className="mt-2 text-xs leading-5 text-white/56">{action.description}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2 text-xs uppercase tracking-[0.2em] text-white/52">
+          <div className="mt-3 flex flex-wrap gap-2 text-xs uppercase tracking-[0.2em] text-white/52">
             <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1">WASD move</span>
             <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1">Shift sprint</span>
-            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1">1-2-3 select</span>
-            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1">Enter or blink confirm</span>
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1">Enter enter venue</span>
           </div>
         </div>
       </div>
@@ -246,14 +268,14 @@ function SkyportSceneRoot({
   keyStateRef,
   openDistrictId,
   trackingMode,
-  attentionRawY,
   motionLatencyMs,
+  onSelectDistrict,
 }: {
   keyStateRef: MutableRefObject<KeyboardState>;
   openDistrictId: string | null;
-  trackingMode: "remote" | "local";
-  attentionRawY: number;
+  trackingMode: "off" | "remote" | "local";
   motionLatencyMs: number | null;
+  onSelectDistrict: (districtId: string) => void;
 }) {
   const introReady = useSkyportWorldStore((state) => state.introReady);
   const gradientTexture = useMemo(() => createToonGradientTexture(), []);
@@ -266,55 +288,64 @@ function SkyportSceneRoot({
 
   return (
     <>
-      <color attach="background" args={["#050816"]} />
-      <fog attach="fog" args={["#0a1020", 18, 78]} />
+      <color attach="background" args={["#6e8fb3"]} />
+      <fogExp2 attach="fog" args={["#9db9d8", 0.0038]} />
 
-      <SkyBackdrop />
-      <AtmosphereBands />
-      <ambientLight intensity={0.62} />
-      <hemisphereLight intensity={0.82} color="#fef3c7" groundColor="#0b1020" />
+      <InitialCameraPose />
+      <Sky distance={450000} sunPosition={[120, 42, -90]} turbidity={9} rayleigh={1.7} mieCoefficient={0.005} mieDirectionalG={0.77} />
+      <AtmosphereClouds />
+
+      <ambientLight intensity={0.4} />
+      <hemisphereLight intensity={0.86} color="#fff3d2" groundColor="#3b5368" />
       <directionalLight
         castShadow
-        intensity={2.9}
-        color="#fff2c7"
-        position={[16, 22, 10]}
+        intensity={1.6}
+        color="#ffd7a8"
+        position={[30, 42, 22]}
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
         shadow-camera-near={0.1}
-        shadow-camera-far={80}
-        shadow-camera-left={-26}
-        shadow-camera-right={26}
-        shadow-camera-top={26}
-        shadow-camera-bottom={-26}
+        shadow-camera-far={200}
+        shadow-camera-left={-60}
+        shadow-camera-right={60}
+        shadow-camera-top={60}
+        shadow-camera-bottom={-60}
       />
-      <pointLight intensity={58} color="#22d3ee" position={[0, 9, 2]} distance={44} />
-      <pointLight intensity={36} color="#f472b6" position={[0, 6, -14]} distance={30} />
+      <directionalLight intensity={0.46} color="#cde2ff" position={[-28, 22, -30]} />
+      <pointLight intensity={2.9} color="#86efac" position={[0, 8, 0]} distance={52} />
+      <pointLight intensity={1.2} color="#38bdf8" position={[-18, 6, 6]} distance={42} />
+      <pointLight intensity={1.2} color="#f97316" position={[18, 6, -8]} distance={42} />
 
       <Physics gravity={[0, -24, 0]} timeStep="vary">
         <WorldBoundaries />
-        <Ground gradientTexture={gradientTexture} />
-        <Suspense fallback={null}>
-          <SkyportGltfEnvironment gradientTexture={gradientTexture} openDistrictId={openDistrictId} districts={SKYPORT_DISTRICTS} />
-        </Suspense>
-        <QuantumHub gradientTexture={gradientTexture} />
-        <HoverDrones gradientTexture={gradientTexture} />
-        <Sparkles count={160} scale={[60, 20, 70]} position={[0, 9, 0]} size={2.2} speed={0.18} color="#67e8f9" />
+        <GroundPlane />
+
+        <SkyportGltfEnvironment
+          gradientTexture={gradientTexture}
+          openDistrictId={openDistrictId}
+          districts={SKYPORT_DISTRICTS}
+          onSelectDistrict={onSelectDistrict}
+        />
+
+        <Sparkles count={52} scale={[160, 30, 160]} position={[0, 14, 0]} size={1.8} speed={0.09} color="#d9f99d" />
+        <AmbientBalloons gradientTexture={gradientTexture} />
+
         <PlayerController keyStateRef={keyStateRef} trackingMode={trackingMode} />
-        <FollowCamera trackingMode={trackingMode} attentionRawY={attentionRawY} />
+        <FollowCamera trackingMode={trackingMode} />
       </Physics>
 
       {introReady ? (
         <EffectComposer multisampling={0}>
-          <Bloom intensity={0.55} mipmapBlur luminanceThreshold={0.42} />
-          <Noise opacity={0.02} />
-          <Vignette eskil={false} offset={0.16} darkness={0.9} />
+          <Bloom intensity={0.28} mipmapBlur luminanceThreshold={0.56} />
+          <Noise opacity={0.015} />
+          <Vignette eskil={false} offset={0.16} darkness={0.68} />
         </EffectComposer>
       ) : null}
 
-      <Html position={[0, 8.5, -18]} center>
-        <div className="rounded-full border border-white/10 bg-slate-950/56 px-4 py-2 text-[11px] uppercase tracking-[0.3em] text-white/70 backdrop-blur-md">
-          Dream Expo City
-          <span className="ml-2 text-white/35">{motionLatencyMs === null ? "--" : `${Math.round(motionLatencyMs)} ms`}</span>
+      <Html position={[0, 10.5, -30]} center>
+        <div className="rounded-full border border-white/15 bg-slate-950/60 px-4 py-2 text-[11px] uppercase tracking-[0.3em] text-white/72 backdrop-blur-md">
+          Skyport Town Square
+          <span className="ml-2 text-white/38">{motionLatencyMs === null ? "--" : `${Math.round(motionLatencyMs)} ms`}</span>
         </div>
       </Html>
     </>
@@ -326,17 +357,21 @@ function PlayerController({
   trackingMode,
 }: {
   keyStateRef: MutableRefObject<KeyboardState>;
-  trackingMode: "remote" | "local";
+  trackingMode: "off" | "remote" | "local";
 }) {
   const rigidBodyRef = useRef<RapierRigidBody | null>(null);
   const avatarRef = useRef<THREE.Group | null>(null);
   const setPlayerPosition = useSkyportWorldStore((state) => state.setPlayerPosition);
+  const setPlayerHeading = useSkyportWorldStore((state) => state.setPlayerHeading);
   const setPlayerMotion = useSkyportWorldStore((state) => state.setPlayerMotion);
   const setNearDistrictId = useSkyportWorldStore((state) => state.setNearDistrictId);
   const introReady = useSkyportWorldStore((state) => state.introReady);
   const gradientTexture = useMemo(() => createToonGradientTexture(), []);
-  const lastHeadingRef = useRef(Math.PI);
+
+  const lastHeadingRef = useRef(INITIAL_PLAYER_HEADING);
   const lastMotionRef = useRef<"idle" | "walk" | "run">("idle");
+  const desiredVelocity = useMemo(() => new THREE.Vector3(), []);
+  const smoothedVelocity = useMemo(() => new THREE.Vector3(), []);
 
   useEffect(() => {
     return () => {
@@ -352,9 +387,11 @@ function PlayerController({
 
     const position = body.translation();
     const currentVelocity = body.linvel();
+
     if (!introReady) {
       body.setLinvel({ x: 0, y: currentVelocity.y, z: 0 }, true);
       setPlayerPosition([position.x, position.y, position.z]);
+      setPlayerHeading(lastHeadingRef.current);
       if (lastMotionRef.current !== "idle") {
         lastMotionRef.current = "idle";
         setPlayerMotion("idle");
@@ -364,31 +401,45 @@ function PlayerController({
 
     const keys = keyStateRef.current;
     const inputX = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
-    const inputZ = (keys.back ? 1 : 0) - (keys.forward ? 1 : 0);
-    const moveVector = new THREE.Vector3(inputX, 0, inputZ);
-    const hasIntent = moveVector.lengthSq() > 0;
-    const speed = keys.sprint ? (trackingMode === "local" ? 8.2 : 6.4) : trackingMode === "local" ? 5.7 : 4.6;
-    const nextMotion: "idle" | "walk" | "run" = hasIntent ? (keys.sprint ? "run" : "walk") : "idle";
+    const inputZ = (keys.forward ? 1 : 0) - (keys.back ? 1 : 0);
+    const hasIntent = inputX !== 0 || inputZ !== 0;
 
+    const walkSpeed = trackingMode === "remote" ? 4.4 : 4.9;
+    const sprintSpeed = trackingMode === "remote" ? 6.4 : 7;
+    const targetSpeed = keys.sprint ? sprintSpeed : walkSpeed;
+
+    desiredVelocity.set(0, 0, 0);
     if (hasIntent) {
-      moveVector.normalize();
-      body.setLinvel({ x: moveVector.x * speed, y: currentVelocity.y, z: moveVector.z * speed }, true);
-      lastHeadingRef.current = Math.atan2(moveVector.x, moveVector.z);
-    } else {
-      body.setLinvel({ x: 0, y: currentVelocity.y, z: 0 }, true);
+      // World-axis locomotion keeps WASD predictable regardless of camera settling.
+      desiredVelocity.set(inputX, 0, -inputZ);
+      desiredVelocity.normalize().multiplyScalar(targetSpeed);
+
+      const targetHeading = Math.atan2(desiredVelocity.x, desiredVelocity.z);
+      lastHeadingRef.current = dampAngle(lastHeadingRef.current, targetHeading, delta, 12);
     }
+
+    smoothedVelocity.set(currentVelocity.x, 0, currentVelocity.z);
+    const smoothing = hasIntent ? 12 : 18;
+    smoothedVelocity.lerp(desiredVelocity, 1 - Math.exp(-delta * smoothing));
+
+    body.setLinvel({ x: smoothedVelocity.x, y: currentVelocity.y, z: smoothedVelocity.z }, true);
 
     const nextPosition = body.translation();
     setPlayerPosition([nextPosition.x, nextPosition.y, nextPosition.z]);
+    setPlayerHeading(lastHeadingRef.current);
     setNearDistrictId(resolveNearbyDistrict(nextPosition.x, nextPosition.z));
+
+    const horizontalSpeed = smoothedVelocity.length();
+    const nextMotion: "idle" | "walk" | "run" =
+      horizontalSpeed < 0.2 ? "idle" : keys.sprint && horizontalSpeed > walkSpeed * 1.08 ? "run" : "walk";
+
     if (nextMotion !== lastMotionRef.current) {
       lastMotionRef.current = nextMotion;
       setPlayerMotion(nextMotion);
     }
 
     if (avatarRef.current) {
-      const targetRotation = lastHeadingRef.current;
-      avatarRef.current.rotation.y = THREE.MathUtils.lerp(avatarRef.current.rotation.y, targetRotation, 1 - Math.exp(-delta * 10));
+      avatarRef.current.rotation.y = dampAngle(avatarRef.current.rotation.y, lastHeadingRef.current, delta, 12);
     }
   });
 
@@ -396,86 +447,57 @@ function PlayerController({
     <RigidBody
       ref={rigidBodyRef}
       colliders={false}
-      position={[0, 1.4, 18]}
+      position={PLAYER_SPAWN}
       enabledRotations={[false, false, false]}
       linearDamping={10}
       angularDamping={20}
       canSleep={false}
       friction={1.2}
     >
-      <CapsuleCollider args={[0.78, 0.48]} position={[0, 0.78, 0]} />
+      <CapsuleCollider args={[0.52, 0.36]} position={[0, 0.9, 0]} />
       <group ref={avatarRef}>
-        <Suspense fallback={<AvatarVisual gradientTexture={gradientTexture} />}>
-          <SkyportAvatar gradientTexture={gradientTexture} />
-        </Suspense>
+        <AvatarActor gradientTexture={gradientTexture} />
       </group>
     </RigidBody>
   );
 }
 
-function AvatarVisual({ gradientTexture }: { gradientTexture: THREE.DataTexture }) {
+function AvatarActor({ gradientTexture }: { gradientTexture: THREE.DataTexture }) {
+  return (
+    <Suspense fallback={<AvatarShell gradientTexture={gradientTexture} />}>
+      <SkyportAvatar gradientTexture={gradientTexture} />
+    </Suspense>
+  );
+}
+
+function AvatarShell({ gradientTexture }: { gradientTexture: THREE.DataTexture }) {
+  const motion = useSkyportWorldStore((state) => state.playerMotion);
   const rootRef = useRef<THREE.Group | null>(null);
-  const haloRef = useRef<THREE.Mesh | null>(null);
 
   useFrame((state) => {
-    const time = state.clock.elapsedTime;
-    const bob = Math.sin(time * 4.6) * 0.035;
+    const t = state.clock.elapsedTime;
+    const bob = motion === "idle" ? 0.01 : motion === "walk" ? 0.03 : 0.05;
+    const speed = motion === "idle" ? 2 : motion === "walk" ? 6 : 8;
     if (rootRef.current) {
-      rootRef.current.position.y = bob;
-    }
-    if (haloRef.current) {
-      haloRef.current.scale.setScalar(1 + Math.sin(time * 2.8) * 0.06);
+      rootRef.current.position.y = Math.sin(t * speed) * bob;
     }
   });
 
   return (
     <group ref={rootRef}>
-      <mesh position={[0, 1.56, 0]} castShadow>
-        <capsuleGeometry args={[0.42, 0.78, 6, 12]} />
-        <meshToonMaterial color="#0f172a" gradientMap={gradientTexture} />
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.02, 0]} renderOrder={-1}>
+        <circleGeometry args={[0.42, 28]} />
+        <meshBasicMaterial color="#020617" transparent opacity={0.16} />
       </mesh>
 
-      <mesh position={[0, 2.46, 0]} castShadow>
-        <sphereGeometry args={[0.42, 18, 18]} />
-        <meshToonMaterial color="#f8dcc7" gradientMap={gradientTexture} />
+      <mesh position={[0, 0.9, 0]} castShadow>
+        <capsuleGeometry args={[0.26, 0.88, 6, 12]} />
+        <meshToonMaterial color="#dbeafe" gradientMap={gradientTexture} />
       </mesh>
 
-      <mesh position={[0, 2.8, -0.02]} castShadow>
-        <sphereGeometry args={[0.48, 18, 18, 0, Math.PI * 2, 0, Math.PI / 1.9]} />
-        <meshToonMaterial color="#13203f" gradientMap={gradientTexture} />
-      </mesh>
-
-      <mesh position={[0, 1.92, 0.26]} castShadow>
-        <boxGeometry args={[0.78, 0.48, 0.2]} />
-        <meshToonMaterial color="#60a5fa" gradientMap={gradientTexture} />
-      </mesh>
-
-      <mesh position={[0, 1.58, -0.06]} castShadow>
-        <boxGeometry args={[0.86, 0.68, 0.24]} />
-        <meshToonMaterial color="#1d4ed8" gradientMap={gradientTexture} />
-      </mesh>
-
-      <mesh position={[-0.36, 1.48, 0]} castShadow rotation-z={0.18}>
-        <capsuleGeometry args={[0.1, 0.42, 4, 8]} />
-        <meshToonMaterial color="#f8dcc7" gradientMap={gradientTexture} />
-      </mesh>
-      <mesh position={[0.36, 1.48, 0]} castShadow rotation-z={-0.18}>
-        <capsuleGeometry args={[0.1, 0.42, 4, 8]} />
-        <meshToonMaterial color="#f8dcc7" gradientMap={gradientTexture} />
-      </mesh>
-
-      <mesh position={[-0.18, 0.76, 0]} castShadow rotation-z={0.06}>
-        <capsuleGeometry args={[0.12, 0.58, 4, 8]} />
-        <meshToonMaterial color="#0f172a" gradientMap={gradientTexture} />
-      </mesh>
-      <mesh position={[0.18, 0.76, 0]} castShadow rotation-z={-0.06}>
-        <capsuleGeometry args={[0.12, 0.58, 4, 8]} />
-        <meshToonMaterial color="#0f172a" gradientMap={gradientTexture} />
-      </mesh>
-
-      <mesh ref={haloRef} position={[0, 3.32, 0]}>
-        <torusGeometry args={[0.36, 0.04, 12, 48]} />
-        <meshBasicMaterial color="#67e8f9" transparent opacity={0.8} />
+      <mesh position={[0, 1.86, 0]} castShadow>
+        <sphereGeometry args={[0.28, 16, 16]} />
+        <meshToonMaterial color="#f8fafc" gradientMap={gradientTexture} />
       </mesh>
     </group>
   );
@@ -483,122 +505,91 @@ function AvatarVisual({ gradientTexture }: { gradientTexture: THREE.DataTexture 
 
 function FollowCamera({
   trackingMode,
-  attentionRawY,
 }: {
-  trackingMode: "remote" | "local";
-  attentionRawY: number;
+  trackingMode: "off" | "remote" | "local";
 }) {
   const { camera } = useThree();
   const playerPosition = useSkyportWorldStore((state) => state.playerPosition);
   const introReady = useSkyportWorldStore((state) => state.introReady);
+
   const target = useMemo(() => new THREE.Vector3(), []);
   const lookAt = useMemo(() => new THREE.Vector3(), []);
+  const smoothedLookAt = useMemo(() => new THREE.Vector3(...INITIAL_CAMERA_LOOK_AT), []);
 
   useFrame((_, delta) => {
-    const cameraLift = trackingMode === "local" ? 0 : 0.8;
-    const verticalBias = THREE.MathUtils.mapLinear(attentionRawY, 0, 1, 1.2, -0.8);
-    target.set(playerPosition[0], playerPosition[1] + 5.8 + cameraLift + verticalBias * 0.18, playerPosition[2] + 11.8);
+    const lateralOffset = trackingMode === "remote" ? 7.2 : 6.6;
+    const depthOffset = trackingMode === "remote" ? 8.6 : 7.8;
+    const height = trackingMode === "remote" ? 6.8 : 6.1;
+
+    target.set(
+      playerPosition[0] + lateralOffset,
+      playerPosition[1] + height,
+      playerPosition[2] + depthOffset,
+    );
 
     if (!introReady) {
-      target.set(playerPosition[0], playerPosition[1] + 13.5, playerPosition[2] + 26);
+      target.set(playerPosition[0] + 22, playerPosition[1] + 15, playerPosition[2] + 26);
     }
 
-    const alpha = 1 - Math.exp(-delta * 4.4);
-    camera.position.lerp(target, alpha);
-    lookAt.set(playerPosition[0], playerPosition[1] + 1.7, playerPosition[2] - 1.4);
-    camera.lookAt(lookAt);
+    camera.position.lerp(target, 1 - Math.exp(-delta * 4.8));
+
+    lookAt.set(playerPosition[0], playerPosition[1] + 1.28, playerPosition[2] - 0.4);
+
+    smoothedLookAt.lerp(lookAt, 1 - Math.exp(-delta * 7.4));
+    camera.lookAt(smoothedLookAt);
   });
 
   return null;
 }
 
-function Ground({ gradientTexture }: { gradientTexture: THREE.DataTexture }) {
+function InitialCameraPose() {
+  const { camera } = useThree();
+
+  useEffect(() => {
+    camera.position.set(...INITIAL_CAMERA_POSITION);
+    camera.lookAt(...INITIAL_CAMERA_LOOK_AT);
+  }, [camera]);
+
+  return null;
+}
+
+function GroundPlane() {
   return (
     <>
       <RigidBody type="fixed" colliders={false}>
-        <mesh rotation-x={-Math.PI / 2} receiveShadow>
-          <planeGeometry args={[130, 130]} />
-          <meshToonMaterial color="#082032" gradientMap={gradientTexture} />
-        </mesh>
-        <CuboidCollider args={[65, 0.1, 65]} position={[0, -0.1, 0]} />
+        <CuboidCollider args={[140, 0.1, 140]} position={[0, -0.1, 0]} />
       </RigidBody>
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0.015, 0]}>
-        <planeGeometry args={[130, 130]} />
-        <meshBasicMaterial color="#11213e" transparent opacity={0.12} />
+
+      <mesh rotation-x={-Math.PI / 2} position={[0, -0.2, 0]}>
+        <planeGeometry args={[320, 320]} />
+        <meshBasicMaterial color="#213447" />
       </mesh>
     </>
   );
 }
 
-function SkyportPromenade({ gradientTexture }: { gradientTexture: THREE.DataTexture }) {
-  const strips = useMemo(() => [-18, -9, 0, 9, 18], []);
-  return (
-    <>
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0.02, 0]}>
-        <planeGeometry args={[18, 56]} />
-        <meshToonMaterial color="#132138" gradientMap={gradientTexture} />
-      </mesh>
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0.03, 0]}>
-        <planeGeometry args={[0.35, 56]} />
-        <meshBasicMaterial color="#67e8f9" transparent opacity={0.44} />
-      </mesh>
-      {strips.map((z) => (
-        <mesh key={z} rotation-x={-Math.PI / 2} position={[0, 0.026, z]}>
-          <planeGeometry args={[18, 0.12]} />
-          <meshBasicMaterial color="#f8fafc" transparent opacity={0.16} />
-        </mesh>
-      ))}
-    </>
-  );
-}
-
-function QuantumHub({ gradientTexture }: { gradientTexture: THREE.DataTexture }) {
-  return (
-    <group position={[0, 0, 0]}>
-      <Float speed={1.3} rotationIntensity={0.16} floatIntensity={0.22}>
-        <mesh position={[0, 3.6, 0]} castShadow>
-          <torusGeometry args={[1.9, 0.13, 18, 72]} />
-          <meshToonMaterial color="#67e8f9" gradientMap={gradientTexture} />
-        </mesh>
-      </Float>
-      <mesh position={[0, 0.44, 0]} castShadow>
-        <cylinderGeometry args={[2.6, 3.2, 0.5, 64]} />
-        <meshToonMaterial color="#0b1528" gradientMap={gradientTexture} />
-      </mesh>
-      <mesh position={[0, 1.72, 0]} castShadow>
-        <cylinderGeometry args={[0.9, 1.15, 2.14, 8]} />
-        <meshToonMaterial color="#172554" gradientMap={gradientTexture} />
-      </mesh>
-      <mesh position={[0, 0.55, 0]} rotation-x={-Math.PI / 2}>
-        <ringGeometry args={[3.4, 4.2, 64]} />
-        <meshBasicMaterial color="#67e8f9" transparent opacity={0.16} side={THREE.DoubleSide} />
-      </mesh>
-    </group>
-  );
-}
-
-function HoverDrones({ gradientTexture }: { gradientTexture: THREE.DataTexture }) {
-  const drones = useMemo(
+function AmbientBalloons({ gradientTexture }: { gradientTexture: THREE.DataTexture }) {
+  const balloons = useMemo(
     () => [
-      { id: "dr-1", position: [-16, 6.4, 2] as [number, number, number] },
-      { id: "dr-2", position: [14, 7.2, -4] as [number, number, number] },
-      { id: "dr-3", position: [5, 5.8, 16] as [number, number, number] },
+      { id: "balloon-1", position: [-26, 20, -18] as [number, number, number], color: "#fef3c7" },
+      { id: "balloon-2", position: [28, 22, 8] as [number, number, number], color: "#dbeafe" },
+      { id: "balloon-3", position: [8, 18, 30] as [number, number, number], color: "#fce7f3" },
     ],
     [],
   );
 
   return (
     <>
-      {drones.map((drone) => (
-        <Float key={drone.id} speed={1.3} rotationIntensity={0.18} floatIntensity={0.3}>
-          <group position={drone.position}>
+      {balloons.map((balloon) => (
+        <Float key={balloon.id} speed={0.7} rotationIntensity={0.1} floatIntensity={0.26}>
+          <group position={balloon.position}>
             <mesh castShadow>
-              <sphereGeometry args={[0.34, 16, 16]} />
-              <meshToonMaterial color="#dbeafe" gradientMap={gradientTexture} />
+              <sphereGeometry args={[0.7, 18, 18]} />
+              <meshToonMaterial color={balloon.color} gradientMap={gradientTexture} />
             </mesh>
-            <mesh position={[0, 0, 0.36]}>
-              <ringGeometry args={[0.18, 0.24, 24]} />
-              <meshBasicMaterial color="#67e8f9" transparent opacity={0.8} />
+            <mesh position={[0, -0.8, 0]}>
+              <cylinderGeometry args={[0.03, 0.05, 1.4, 6]} />
+              <meshToonMaterial color="#1f2937" gradientMap={gradientTexture} />
             </mesh>
           </group>
         </Float>
@@ -607,89 +598,12 @@ function HoverDrones({ gradientTexture }: { gradientTexture: THREE.DataTexture }
   );
 }
 
-function WorldBoundaries() {
-  const wallColor = "#0f172a";
-  return (
-    <>
-      <RigidBody type="fixed" colliders={false}>
-        <CuboidCollider args={[36, 3, 0.8]} position={[0, 3, -31]} />
-        <CuboidCollider args={[36, 3, 0.8]} position={[0, 3, 31]} />
-        <CuboidCollider args={[0.8, 3, 31]} position={[-31, 3, 0]} />
-        <CuboidCollider args={[0.8, 3, 31]} position={[31, 3, 0]} />
-      </RigidBody>
-      <mesh position={[0, 3, -31]}>
-        <boxGeometry args={[72, 6, 0.6]} />
-        <meshStandardMaterial color={wallColor} transparent opacity={0.04} />
-      </mesh>
-      <mesh position={[0, 3, 31]}>
-        <boxGeometry args={[72, 6, 0.6]} />
-        <meshStandardMaterial color={wallColor} transparent opacity={0.04} />
-      </mesh>
-      <mesh position={[-31, 3, 0]}>
-        <boxGeometry args={[0.6, 6, 62]} />
-        <meshStandardMaterial color={wallColor} transparent opacity={0.04} />
-      </mesh>
-      <mesh position={[31, 3, 0]}>
-        <boxGeometry args={[0.6, 6, 62]} />
-        <meshStandardMaterial color={wallColor} transparent opacity={0.04} />
-      </mesh>
-    </>
-  );
-}
-
-function SkyBackdrop() {
-  const shader = useMemo(
-    () => ({
-      uniforms: {
-        topColor: { value: new THREE.Color("#182b58") },
-        middleColor: { value: new THREE.Color("#3a2b68") },
-        bottomColor: { value: new THREE.Color("#fff1cc") },
-      },
-      vertexShader: `
-        varying vec3 vWorldPosition;
-        void main() {
-          vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-          vWorldPosition = worldPosition.xyz;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform vec3 topColor;
-        uniform vec3 middleColor;
-        uniform vec3 bottomColor;
-        varying vec3 vWorldPosition;
-        void main() {
-          float h = normalize(vWorldPosition + vec3(0.0, 18.0, 0.0)).y;
-          vec3 color = mix(bottomColor, middleColor, smoothstep(-0.1, 0.38, h));
-          color = mix(color, topColor, smoothstep(0.28, 0.95, h));
-          gl_FragColor = vec4(color, 1.0);
-        }
-      `,
-      side: THREE.BackSide,
-    }),
-    [],
-  );
-
-  return (
-    <group>
-      <mesh>
-        <sphereGeometry args={[90, 32, 32]} />
-        <shaderMaterial args={[shader]} side={THREE.BackSide} />
-      </mesh>
-      <mesh position={[0, 24, -40]}>
-        <circleGeometry args={[7, 40]} />
-        <meshBasicMaterial color="#fff1cc" transparent opacity={0.5} />
-      </mesh>
-    </group>
-  );
-}
-
-function AtmosphereBands() {
+function AtmosphereClouds() {
   const ribbons = useMemo(
     () => [
-      { id: "a", position: [-18, 16, -22] as [number, number, number], rotationZ: 0.18, color: "#7dd3fc", opacity: 0.12 },
-      { id: "b", position: [12, 13, -18] as [number, number, number], rotationZ: -0.22, color: "#f9a8d4", opacity: 0.08 },
-      { id: "c", position: [0, 9, -28] as [number, number, number], rotationZ: 0.04, color: "#fde68a", opacity: 0.1 },
+      { id: "cloud-a", position: [-34, 24, -60] as [number, number, number], color: "#e5f1ff", opacity: 0.15 },
+      { id: "cloud-b", position: [24, 20, -52] as [number, number, number], color: "#ffe7c3", opacity: 0.12 },
+      { id: "cloud-c", position: [4, 17, -70] as [number, number, number], color: "#f8fafc", opacity: 0.11 },
     ],
     [],
   );
@@ -697,9 +611,9 @@ function AtmosphereBands() {
   return (
     <>
       {ribbons.map((ribbon) => (
-        <Float key={ribbon.id} speed={0.7} rotationIntensity={0.08} floatIntensity={0.22}>
-          <mesh position={ribbon.position} rotation-z={ribbon.rotationZ}>
-            <planeGeometry args={[26, 5]} />
+        <Float key={ribbon.id} speed={0.5} rotationIntensity={0.05} floatIntensity={0.14}>
+          <mesh position={ribbon.position}>
+            <planeGeometry args={[34, 8]} />
             <meshBasicMaterial color={ribbon.color} transparent opacity={ribbon.opacity} side={THREE.DoubleSide} />
           </mesh>
         </Float>
@@ -708,11 +622,16 @@ function AtmosphereBands() {
   );
 }
 
-const FALLBACK_ACTIONS = [
-  { id: "story", label: "Approach", description: "Caminhe ate um distrito para ativar as opcoes." },
-  { id: "enter", label: "Focus", description: "Use o olho para selecionar um slot contextual." },
-  { id: "challenge", label: "Confirm", description: "Blink ou Enter para confirmar a acao." },
-];
+function WorldBoundaries() {
+  return (
+    <RigidBody type="fixed" colliders={false}>
+      <CuboidCollider args={[94, 4, 0.8]} position={[0, 4, -92]} />
+      <CuboidCollider args={[94, 4, 0.8]} position={[0, 4, 92]} />
+      <CuboidCollider args={[0.8, 4, 92]} position={[-92, 4, 0]} />
+      <CuboidCollider args={[0.8, 4, 92]} position={[92, 4, 0]} />
+    </RigidBody>
+  );
+}
 
 function ScenePill({ label, value }: { label: string; value: string }) {
   return (
@@ -724,12 +643,12 @@ function ScenePill({ label, value }: { label: string; value: string }) {
 
 function createToonGradientTexture() {
   const data = new Uint8Array([
-    38, 48, 84,
-    84, 112, 168,
-    160, 201, 255,
-    255, 244, 214,
+    32, 56, 85, 255,
+    80, 120, 160, 255,
+    150, 204, 255, 255,
+    255, 246, 220, 255,
   ]);
-  const texture = new THREE.DataTexture(data, 4, 1, THREE.RGBFormat);
+  const texture = new THREE.DataTexture(data, 4, 1, THREE.RGBAFormat);
   texture.needsUpdate = true;
   texture.minFilter = THREE.NearestFilter;
   texture.magFilter = THREE.NearestFilter;
@@ -753,4 +672,9 @@ function resolveNearbyDistrict(x: number, z: number) {
   }
 
   return nearest?.id ?? null;
+}
+
+function dampAngle(current: number, target: number, delta: number, lambda: number) {
+  const difference = Math.atan2(Math.sin(target - current), Math.cos(target - current));
+  return current + difference * (1 - Math.exp(-delta * lambda));
 }

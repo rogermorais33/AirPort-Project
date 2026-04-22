@@ -1,5 +1,4 @@
 export type DistrictActionId = "story" | "enter" | "challenge";
-export type WorldLandmarkType = "market" | "apartments";
 
 export interface DistrictAction {
   id: DistrictActionId;
@@ -13,7 +12,7 @@ export interface WorldDistrict {
   subtitle: string;
   color: string;
   accent: string;
-  landmarkType: WorldLandmarkType;
+  landmarkModelPath: string;
   boothId: string;
   position: [number, number, number];
   shellSize: [number, number, number];
@@ -32,11 +31,11 @@ export const SKYPORT_DISTRICTS: WorldDistrict[] = [
     subtitle: "memories, doors and blink cues",
     color: "#f59e0b",
     accent: "#fde68a",
-    landmarkType: "apartments",
-    position: [-11, 0, -10],
-    shellSize: [8, 5.2, 7.2],
-    zoneRadius: 7.4,
-    signLabel: "Relive Lane",
+    landmarkModelPath: "/models/kenney-commercial/building-a.glb",
+    position: [-30, 0, 6],
+    shellSize: [11.2, 10.2, 11.2],
+    zoneRadius: 8,
+    signLabel: "Memory Lane",
     ambientLabel: "soft reels + warm projector glow",
     lore:
       "Um cinema de lembrancas curtas. O blink nao e so input aqui; ele faz o espaco respirar e troca a cena como se o usuario estivesse editando a propria memoria.",
@@ -65,11 +64,11 @@ export const SKYPORT_DISTRICTS: WorldDistrict[] = [
     subtitle: "district for gaze games",
     color: "#d946ef",
     accent: "#f5d0fe",
-    landmarkType: "market",
-    position: [0, 0, -13],
-    shellSize: [9.5, 5.8, 8.4],
-    zoneRadius: 8.2,
-    signLabel: "Arcade Strip",
+    landmarkModelPath: "/models/kenney-commercial/building-skyscraper-b.glb",
+    position: [0, 0, -32],
+    shellSize: [12.2, 18.8, 12.2],
+    zoneRadius: 8,
+    signLabel: "Arcade Port",
     ambientLabel: "synth pads + coin glow",
     lore:
       "A parte mais playful do skyport. O objetivo nao e navegar o mundo com os olhos, e sim usar o olhar como dispositivo de mira, selecao e timing dentro dos minigames.",
@@ -98,11 +97,11 @@ export const SKYPORT_DISTRICTS: WorldDistrict[] = [
     subtitle: "see where the system is reading you",
     color: "#22d3ee",
     accent: "#cffafe",
-    landmarkType: "apartments",
-    position: [11, 0, -10],
-    shellSize: [8.4, 6.2, 7.2],
-    zoneRadius: 7.5,
-    signLabel: "Signal Deck",
+    landmarkModelPath: "/models/kenney-commercial/building-skyscraper-d.glb",
+    position: [30, 0, -4],
+    shellSize: [12, 18, 12],
+    zoneRadius: 8,
+    signLabel: "Signal Tower",
     ambientLabel: "wind chimes + telemetry hum",
     lore:
       "Um observatorio para deixar o tracking explicito e bonito. Ele transforma dados tecnicos em leitura visual: direcao, confianca, origem e estado do input.",
@@ -131,10 +130,10 @@ export const SKYPORT_DISTRICTS: WorldDistrict[] = [
     subtitle: "camera preview and raw gaze stage",
     color: "#34d399",
     accent: "#d1fae5",
-    landmarkType: "market",
-    position: [-11, 0, 10],
-    shellSize: [8.6, 5.5, 7.6],
-    zoneRadius: 7.4,
+    landmarkModelPath: "/models/kenney-commercial/building-h.glb",
+    position: [-24, 0, 30],
+    shellSize: [11, 10.2, 11],
+    zoneRadius: 8,
     signLabel: "Dock 04",
     ambientLabel: "camera shutters + sea breeze",
     lore:
@@ -164,9 +163,9 @@ export const SKYPORT_DISTRICTS: WorldDistrict[] = [
     subtitle: "logs, loops and command language",
     color: "#60a5fa",
     accent: "#dbeafe",
-    landmarkType: "market",
-    position: [0, 0, 13],
-    shellSize: [9.2, 5.4, 8.2],
+    landmarkModelPath: "/models/kenney-commercial/building-m.glb",
+    position: [0, 0, 34],
+    shellSize: [11.8, 10.6, 11.8],
     zoneRadius: 8,
     signLabel: "Cafe Protocol",
     ambientLabel: "soft chatter + relay clicks",
@@ -197,10 +196,10 @@ export const SKYPORT_DISTRICTS: WorldDistrict[] = [
     subtitle: "where natural feel is measured",
     color: "#f472b6",
     accent: "#fbcfe8",
-    landmarkType: "apartments",
-    position: [11, 0, 10],
-    shellSize: [8.6, 5.7, 7.4],
-    zoneRadius: 7.7,
+    landmarkModelPath: "/models/kenney-commercial/building-skyscraper-b.glb",
+    position: [24, 0, -30],
+    shellSize: [12.2, 18.2, 12.2],
+    zoneRadius: 8,
     signLabel: "Lab 08",
     ambientLabel: "pulse lines + diagnostics",
     lore:

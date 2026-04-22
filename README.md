@@ -43,6 +43,7 @@ Frontend em `http://localhost:3000`.
 
 Rotas úteis:
 
+- `http://localhost:3000/`
 - `http://localhost:3000/live`
 - `http://localhost:3000/world`
 
@@ -134,17 +135,32 @@ make firmware-monitor PORT=COM5
 
 O mundo 3D aceita dois modos de tracking:
 
+- `Sem câmera`: exploração manual, sem `getUserMedia`
 - `Browser Cam`: webcam local do notebook, melhor para fluidez
 - `ESP32 / Backend`: prova de conceito do pipeline embarcado
 
-No `/world`, a locomoção continua sendo por teclado:
+No `/world`, a locomoção continua sendo por teclado e o fluxo recomendado agora é:
+
+1. entrar no mundo sem câmera
+2. caminhar com `WASD/setas`
+3. aproximar de um lugar ou abrir um lugar pelo painel
+4. entrar na experiência desse lugar
+5. ativar `Browser Cam` ou `ESP32 / Backend` só quando fizer sentido
+
+Controles base:
 
 - `WASD` ou setas para andar
 - `Shift` para sprint
-- `1 / 2 / 3` para trocar ação contextual
-- `Enter` para confirmar
+- `Enter` para entrar no lugar próximo
+- `1 / 2 / 3` para trocar a aba/ação dentro do lugar aberto
+- `Enter` ou `blink` para confirmar a seleção dentro do lugar aberto
 
-O eye tracking entra como camada contextual perto dos distritos. O preview ao vivo da webcam aparece no distrito `Vision Dock`.
+O eye tracking entra como camada contextual dentro dos lugares. O preview ao vivo da webcam aparece no lugar `Vision Dock`.
+
+Observação atual do mundo:
+
+- o player ativo do `/world` usa um personagem GLB CC0 do kit `Blocky Characters` da Kenney
+- o cenário do `/world` combina kits GLB CC0 da Kenney para vias, skyline, bairros suburbanos, árvores, carros e entradas dos lugares
 
 ### Troubleshooting da Browser Cam
 
@@ -158,7 +174,7 @@ Se você liberar a câmera e ela ainda não aparecer:
    - OBS
    - câmera do Windows
 3. No `/world`, troque para `Browser Cam` e, se necessário, clique em `Retry Cam`.
-4. Vá até o `Vision Dock` para ver o preview local da webcam.
+4. Abra o lugar `Vision Dock` para ver o preview local da webcam.
 5. Se a permissão já tinha sido negada antes, reabra a permissão do site no navegador.
 
 Causas comuns:

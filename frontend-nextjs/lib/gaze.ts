@@ -20,6 +20,19 @@ export function deriveAttentionState(input: {
   const features = input.faceMetrics?.features ?? {};
   const rawX = normalizeFeature(features.gaze_raw_x_norm, 0.5);
   const rawY = normalizeFeature(features.gaze_raw_y_norm, 0.5);
+  const faceDetected = Boolean(input.faceMetrics?.face_detected);
+
+  if (!faceDetected) {
+    return {
+      direction: "center",
+      source: "idle",
+      intensity: 0,
+      rawX,
+      rawY,
+      eyeTrackingActive: false,
+    };
+  }
+
   const eyeTrackingActive = Number(features.iris_available ?? 0) >= 0.5;
 
   if (eyeTrackingActive) {

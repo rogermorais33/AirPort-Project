@@ -72,6 +72,16 @@
     pointer-events: none;
   }
 
+  @keyframes drift {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0);
+    }
+    50% {
+      transform: translate3d(0, -10px, 0);
+    }
+  }
+
   .font-heading {
     font-family: var(--font-heading), ui-sans-serif;
   }
@@ -83,5 +93,9 @@
     border: 1px solid rgba(255, 255, 255, 0.08);
     box-shadow: 0 20px 60px rgba(2, 6, 23, 0.25);
     backdrop-filter: blur(18px);
+  }
+
+  .ambient-drift {
+    animation: drift 8s ease-in-out infinite;
   }
 }

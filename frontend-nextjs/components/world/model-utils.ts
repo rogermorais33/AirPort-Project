@@ -42,6 +42,11 @@ export function applyToonLook(
       return;
     }
 
+    const mesh = child as THREE.Mesh & {
+      isSkinnedMesh?: boolean;
+      morphTargetInfluences?: number[] | null;
+    };
+
     child.castShadow = true;
     child.receiveShadow = true;
 
@@ -59,10 +64,10 @@ export function applyToonLook(
         baseColor.lerp(tintColor, tintStrength);
       }
 
-      const toonMaterial = new THREE.MeshToonMaterial({
-        color: baseColor,
-        map: "map" in source ? source.map ?? null : null,
-        gradientMap: gradientTexture,
+    const toonMaterial = new THREE.MeshToonMaterial({
+      color: baseColor,
+      map: "map" in source ? source.map ?? null : null,
+      gradientMap: gradientTexture,
         transparent: source.transparent,
         opacity: source.opacity,
         alphaTest: source.alphaTest,
@@ -76,6 +81,13 @@ export function applyToonLook(
       toonMaterial.depthWrite = source.depthWrite;
       toonMaterial.depthTest = source.depthTest;
       toonMaterial.toneMapped = source.toneMapped;
+
+      const animatedToonMaterial = toonMaterial as THREE.MeshToonMaterial & {
+        skinning?: boolean;
+        morphTargets?: boolean;
+      };
+      animatedToonMaterial.skinning = Boolean(mesh.isSkinnedMesh);
+      animatedToonMaterial.morphTargets = Boolean(mesh.morphTargetInfluences?.length);
 
       return toonMaterial;
     });

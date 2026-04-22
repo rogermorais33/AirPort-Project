@@ -25,7 +25,7 @@ interface DashboardDataState {
   lastError: string | null;
 }
 
-export function useDashboardData(sessionId: string | null) {
+export function useDashboardData(sessionId: string | null, enabled = true) {
   const [state, setState] = useState<DashboardDataState>({
     health: null,
     faceMetrics: null,
@@ -39,6 +39,9 @@ export function useDashboardData(sessionId: string | null) {
   });
 
   const refreshHealth = useCallback(async () => {
+    if (!enabled) {
+      return;
+    }
     try {
       const health = await getHealth();
       setState((current) => ({ ...current, health, lastError: null }));
@@ -48,9 +51,17 @@ export function useDashboardData(sessionId: string | null) {
         lastError: error instanceof Error ? error.message : "Falha ao carregar health",
       }));
     }
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
+    if (!enabled) {
+      setState((current) => ({
+        ...current,
+        health: null,
+        lastError: null,
+      }));
+      return;
+    }
     void refreshHealth();
     const id = window.setInterval(() => {
       void refreshHealth();
@@ -59,7 +70,7 @@ export function useDashboardData(sessionId: string | null) {
     return () => {
       window.clearInterval(id);
     };
-  }, [refreshHealth]);
+  }, [enabled, refreshHealth]);
 
   const onWsEvent = useCallback((event: WsEnvelope) => {
     if (event.type === "frame_processed") {
@@ -112,6 +123,7 @@ export function useDashboardData(sessionId: string | null) {
   const { status, sendPing } = useWebSocket({
     sessionId,
     onEvent: onWsEvent,
+    enabled,
   });
 
   const pose = useMemo(() => {

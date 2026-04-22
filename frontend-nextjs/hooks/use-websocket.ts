@@ -9,6 +9,7 @@ export type WsStatus = "connecting" | "connected" | "disconnected" | "error";
 interface UseWebSocketOptions {
   sessionId?: string | null;
   onEvent?: (event: WsEnvelope) => void;
+  enabled?: boolean;
 }
 
 const BASE_BACKOFF_MS = 800;
@@ -36,7 +37,7 @@ function getWsBaseUrl(): string {
   return `${protocol}://${window.location.hostname}:8000`;
 }
 
-export function useWebSocket({ sessionId, onEvent }: UseWebSocketOptions) {
+export function useWebSocket({ sessionId, onEvent, enabled = true }: UseWebSocketOptions) {
   const [status, setStatus] = useState<WsStatus>("disconnected");
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const wsRef = useRef<WebSocket | null>(null);
@@ -51,6 +52,11 @@ export function useWebSocket({ sessionId, onEvent }: UseWebSocketOptions) {
   }, [sessionId]);
 
   useEffect(() => {
+    if (!enabled) {
+      setStatus("disconnected");
+      return;
+    }
+
     let mounted = true;
 
     function clearReconnectTimer() {
@@ -113,7 +119,7 @@ export function useWebSocket({ sessionId, onEvent }: UseWebSocketOptions) {
       clearReconnectTimer();
       ws.close();
     };
-  }, [url, reconnectAttempt, onEvent]);
+  }, [enabled, url, reconnectAttempt, onEvent]);
 
   return {
     status,
