@@ -19,7 +19,7 @@ interface SkyportWorldState {
 }
 
 export const useSkyportWorldStore = create<SkyportWorldState>((set) => ({
-  playerPosition: [0, 1, 8],
+  playerPosition: [0, 1.05, 22],
   playerHeading: Math.PI,
   playerMotion: "idle",
   nearDistrictId: null,

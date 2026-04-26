@@ -7,7 +7,7 @@ import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 
-import { applyToonLook, computeObjectFit } from "@/components/world/model-utils";
+import { applyToonLook, computeObjectFit, recolorNamedMaterials } from "@/components/world/model-utils";
 import { useSkyportWorldStore } from "@/components/world/use-skyport-world-store";
 import type { WorldDistrict } from "@/lib/world-data";
 import { cn } from "@/lib/utils";
@@ -50,7 +50,7 @@ const SUPPORT_MODEL_PATHS = [
 ] as const;
 
 const VENUE_AWNING_PATH = "/models/kenney-commercial/detail-awning-wide.glb";
-const NPC_MODEL_PATH = "/models/kenney-characters/character-e.glb";
+const NPC_MODEL_PATH = "/models/avatar.glb";
 
 const SKYLINE_BAND: SceneModelSpec[] = [
   {
@@ -516,6 +516,31 @@ const TRAFFIC_CARS = [
   },
 ] as const;
 
+const RUNWAY_DASHES = Array.from({ length: 13 }).map((_, index) => -72 + index * 12);
+const RUNWAY_LIGHTS = Array.from({ length: 18 }).map((_, index) => -82 + index * 9.6);
+
+const HORIZON_MOUNTAINS = [
+  { id: "ridge-n-1", position: [-142, 0, -158] as [number, number, number], radius: 34, height: 32, color: "#6f8794", rotationY: 0.2 },
+  { id: "ridge-n-2", position: [-94, 0, -166] as [number, number, number], radius: 42, height: 42, color: "#78919a", rotationY: -0.16 },
+  { id: "ridge-n-3", position: [-42, 0, -162] as [number, number, number], radius: 36, height: 35, color: "#617f8e", rotationY: 0.34 },
+  { id: "ridge-n-4", position: [8, 0, -170] as [number, number, number], radius: 48, height: 45, color: "#739099", rotationY: -0.08 },
+  { id: "ridge-n-5", position: [68, 0, -164] as [number, number, number], radius: 40, height: 38, color: "#658493", rotationY: 0.24 },
+  { id: "ridge-n-6", position: [126, 0, -158] as [number, number, number], radius: 34, height: 31, color: "#78919a", rotationY: -0.28 },
+  { id: "ridge-w-1", position: [-160, 0, -80] as [number, number, number], radius: 34, height: 28, color: "#617f8e", rotationY: 0.58 },
+  { id: "ridge-e-1", position: [160, 0, -72] as [number, number, number], radius: 32, height: 29, color: "#6f8794", rotationY: -0.52 },
+  { id: "ridge-s-1", position: [-108, 0, 156] as [number, number, number], radius: 34, height: 25, color: "#5f8178", rotationY: 0.14 },
+  { id: "ridge-s-2", position: [98, 0, 160] as [number, number, number], radius: 38, height: 27, color: "#668a7c", rotationY: -0.22 },
+] as const;
+
+const DISTANT_TOWERS = [
+  { id: "distant-a", position: [-112, 10, -126] as [number, number, number], size: [8, 20, 8] as [number, number, number], color: "#4f6f86" },
+  { id: "distant-b", position: [-96, 15, -132] as [number, number, number], size: [10, 30, 10] as [number, number, number], color: "#5d7790" },
+  { id: "distant-c", position: [-78, 12, -128] as [number, number, number], size: [9, 24, 9] as [number, number, number], color: "#55758a" },
+  { id: "distant-d", position: [78, 14, -130] as [number, number, number], size: [10, 28, 10] as [number, number, number], color: "#55758a" },
+  { id: "distant-e", position: [98, 11, -126] as [number, number, number], size: [8, 22, 8] as [number, number, number], color: "#4f6f86" },
+  { id: "distant-f", position: [116, 17, -134] as [number, number, number], size: [11, 34, 11] as [number, number, number], color: "#5d7790" },
+] as const;
+
 const PRELOAD_PATHS = [
   ...new Set<string>([
     ...SKYLINE_BAND.map((item) => item.path),
@@ -541,7 +566,9 @@ export function SkyportGltfEnvironment({
   return (
     <>
       <TownSurface gradientTexture={gradientTexture} districts={districts} />
+      <OutskirtsScenery gradientTexture={gradientTexture} />
       <CentralPlaza gradientTexture={gradientTexture} />
+      <DistrictGuideLines districts={districts} />
       <DistrictGlowRings districts={districts} />
 
       <Suspense fallback={null}>
@@ -564,6 +591,17 @@ export function SkyportGltfEnvironment({
         </Suspense>
       ))}
     </>
+  );
+}
+
+function OutskirtsScenery({ gradientTexture }: { gradientTexture: THREE.DataTexture }) {
+  return (
+    <group>
+      <DistantTerrain gradientTexture={gradientTexture} />
+      <AirportHorizon gradientTexture={gradientTexture} />
+      <CoastalHarbor gradientTexture={gradientTexture} />
+      <ElevatedTransit gradientTexture={gradientTexture} />
+    </group>
   );
 }
 
@@ -717,6 +755,342 @@ function SurfacePlane({
   );
 }
 
+function DistantTerrain({ gradientTexture }: { gradientTexture: THREE.DataTexture }) {
+  return (
+    <group>
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.01, -136]}>
+        <planeGeometry args={[360, 82]} />
+        <meshToonMaterial color="#405f55" gradientMap={gradientTexture} />
+      </mesh>
+
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.012, 138]}>
+        <planeGeometry args={[380, 104]} />
+        <meshBasicMaterial color="#3f9fb4" transparent opacity={0.78} />
+      </mesh>
+
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.018, 96]}>
+        <planeGeometry args={[320, 20]} />
+        <meshToonMaterial color="#d4c7a4" gradientMap={gradientTexture} />
+      </mesh>
+
+      <mesh position={[0, 7, -147]}>
+        <planeGeometry args={[360, 32]} />
+        <meshBasicMaterial color="#cfe0e8" transparent opacity={0.18} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+
+      {HORIZON_MOUNTAINS.map((mountain) => (
+        <mesh
+          key={mountain.id}
+          position={[mountain.position[0], mountain.height / 2 - 1.4, mountain.position[2]]}
+          rotation-y={mountain.rotationY}
+        >
+          <coneGeometry args={[mountain.radius, mountain.height, 4]} />
+          <meshToonMaterial color={mountain.color} gradientMap={gradientTexture} transparent opacity={0.82} />
+        </mesh>
+      ))}
+
+      {DISTANT_TOWERS.map((tower) => (
+        <mesh key={tower.id} position={tower.position}>
+          <boxGeometry args={tower.size} />
+          <meshBasicMaterial color={tower.color} transparent opacity={0.46} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function AirportHorizon({ gradientTexture }: { gradientTexture: THREE.DataTexture }) {
+  return (
+    <group position={[0, 0, -24]}>
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.07, -109]} receiveShadow>
+        <planeGeometry args={[174, 30]} />
+        <meshToonMaterial color="#55645f" gradientMap={gradientTexture} />
+      </mesh>
+
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.082, -110]} receiveShadow>
+        <planeGeometry args={[158, 18]} />
+        <meshToonMaterial color="#2d3744" gradientMap={gradientTexture} />
+      </mesh>
+
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.088, -82]} receiveShadow>
+        <planeGeometry args={[118, 8]} />
+        <meshToonMaterial color="#42505d" gradientMap={gradientTexture} />
+      </mesh>
+
+      <mesh rotation-x={-Math.PI / 2} rotation-z={Math.PI * 0.18} position={[44, 0.09, -93]} receiveShadow>
+        <planeGeometry args={[52, 7]} />
+        <meshToonMaterial color="#42505d" gradientMap={gradientTexture} />
+      </mesh>
+
+      {RUNWAY_DASHES.map((x) => (
+        <mesh key={`runway-dash-${x}`} rotation-x={-Math.PI / 2} position={[x, 0.105, -110]}>
+          <planeGeometry args={[5.2, 0.48]} />
+          <meshBasicMaterial color="#f8fafc" transparent opacity={0.58} />
+        </mesh>
+      ))}
+
+      {RUNWAY_LIGHTS.map((x) => (
+        <group key={`runway-light-${x}`}>
+          <mesh position={[x, 0.24, -99.2]}>
+            <sphereGeometry args={[0.16, 12, 12]} />
+            <meshBasicMaterial color="#a7f3d0" transparent opacity={0.92} />
+          </mesh>
+          <mesh position={[x, 0.24, -120.8]}>
+            <sphereGeometry args={[0.16, 12, 12]} />
+            <meshBasicMaterial color="#bfdbfe" transparent opacity={0.92} />
+          </mesh>
+        </group>
+      ))}
+
+      <TerminalBuilding gradientTexture={gradientTexture} />
+      <ControlTower gradientTexture={gradientTexture} />
+      <AirportShuttle gradientTexture={gradientTexture} />
+    </group>
+  );
+}
+
+function TerminalBuilding({ gradientTexture }: { gradientTexture: THREE.DataTexture }) {
+  return (
+    <group position={[-44, 0, -78]}>
+      <mesh position={[0, 3.2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[34, 6.4, 9]} />
+        <meshToonMaterial color="#d8e4ec" gradientMap={gradientTexture} />
+      </mesh>
+      <mesh position={[0, 6.8, -0.8]} castShadow receiveShadow>
+        <boxGeometry args={[38, 1.2, 10.4]} />
+        <meshToonMaterial color="#9caeb9" gradientMap={gradientTexture} />
+      </mesh>
+      <mesh position={[0, 3.5, 4.65]}>
+        <boxGeometry args={[30, 3.4, 0.18]} />
+        <meshBasicMaterial color="#24516a" transparent opacity={0.72} />
+      </mesh>
+      <mesh position={[18.5, 2, 1.8]} castShadow receiveShadow>
+        <boxGeometry args={[9, 4, 5]} />
+        <meshToonMaterial color="#eff6ff" gradientMap={gradientTexture} />
+      </mesh>
+      <mesh position={[18.5, 2.4, 4.5]}>
+        <boxGeometry args={[6.8, 1.6, 0.16]} />
+        <meshBasicMaterial color="#67e8f9" transparent opacity={0.62} />
+      </mesh>
+    </group>
+  );
+}
+
+function ControlTower({ gradientTexture }: { gradientTexture: THREE.DataTexture }) {
+  return (
+    <group position={[47, 0, -78]}>
+      <mesh position={[0, 5.6, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[1.25, 1.75, 11.2, 10]} />
+        <meshToonMaterial color="#cbd5e1" gradientMap={gradientTexture} />
+      </mesh>
+      <mesh position={[0, 11.8, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[3.3, 2.8, 2.4, 8]} />
+        <meshToonMaterial color="#e2e8f0" gradientMap={gradientTexture} />
+      </mesh>
+      <mesh position={[0, 11.9, 0]}>
+        <cylinderGeometry args={[3.42, 3.42, 1, 8, 1, true]} />
+        <meshBasicMaterial color="#0f2b3a" transparent opacity={0.56} />
+      </mesh>
+      <mesh position={[0, 13.35, 0]} castShadow>
+        <coneGeometry args={[3.25, 1.35, 8]} />
+        <meshToonMaterial color="#7dd3fc" gradientMap={gradientTexture} />
+      </mesh>
+      <mesh position={[0, 15.1, 0]}>
+        <sphereGeometry args={[0.24, 14, 14]} />
+        <meshBasicMaterial color="#fef3c7" transparent opacity={0.95} />
+      </mesh>
+    </group>
+  );
+}
+
+function AirportShuttle({ gradientTexture }: { gradientTexture: THREE.DataTexture }) {
+  const rootRef = useRef<THREE.Group | null>(null);
+
+  useFrame((state) => {
+    if (!rootRef.current) {
+      return;
+    }
+    const t = state.clock.elapsedTime;
+    rootRef.current.position.x = THREE.MathUtils.lerp(-32, 34, (Math.sin(t * 0.16) + 1) / 2);
+    rootRef.current.rotation.z = Math.sin(t * 0.9) * 0.012;
+  });
+
+  return (
+    <group ref={rootRef} position={[18, 1.05, -109.5]} rotation-y={Math.PI / 2}>
+      <mesh rotation-z={Math.PI / 2} castShadow>
+        <cylinderGeometry args={[0.55, 0.55, 8.8, 18]} />
+        <meshToonMaterial color="#f8fafc" gradientMap={gradientTexture} />
+      </mesh>
+      <mesh position={[0, 0.08, 0]} rotation-z={Math.PI / 2}>
+        <cylinderGeometry args={[0.58, 0.3, 1.2, 18]} />
+        <meshToonMaterial color="#dbeafe" gradientMap={gradientTexture} />
+      </mesh>
+      <mesh position={[0, -0.12, 0]} rotation-z={Math.PI / 2}>
+        <boxGeometry args={[0.16, 5.8, 3.2]} />
+        <meshToonMaterial color="#bfdbfe" gradientMap={gradientTexture} />
+      </mesh>
+      <mesh position={[-2.6, -0.05, 0]} rotation-z={Math.PI / 2}>
+        <boxGeometry args={[0.12, 2.8, 1.2]} />
+        <meshToonMaterial color="#dbeafe" gradientMap={gradientTexture} />
+      </mesh>
+    </group>
+  );
+}
+
+function CoastalHarbor({ gradientTexture }: { gradientTexture: THREE.DataTexture }) {
+  return (
+    <group>
+      <mesh rotation-x={-Math.PI / 2} position={[-38, 0.08, 82]} receiveShadow>
+        <planeGeometry args={[52, 8]} />
+        <meshToonMaterial color="#d9cfb2" gradientMap={gradientTexture} />
+      </mesh>
+      <mesh position={[-36, 0.34, 98]} castShadow receiveShadow>
+        <boxGeometry args={[42, 0.68, 5.4]} />
+        <meshToonMaterial color="#8b6f4d" gradientMap={gradientTexture} />
+      </mesh>
+      <mesh position={[-56, 1.8, 97]} castShadow receiveShadow>
+        <boxGeometry args={[7, 3.6, 5]} />
+        <meshToonMaterial color="#e7eef5" gradientMap={gradientTexture} />
+      </mesh>
+      <mesh position={[-56, 3.9, 97]} castShadow>
+        <coneGeometry args={[4.6, 2.2, 4]} />
+        <meshToonMaterial color="#34d399" gradientMap={gradientTexture} />
+      </mesh>
+      <mesh rotation-x={-Math.PI / 2} position={[-18, 0.1, 118]}>
+        <ringGeometry args={[10, 13, 48]} />
+        <meshBasicMaterial color="#d1fae5" transparent opacity={0.16} side={THREE.DoubleSide} />
+      </mesh>
+    </group>
+  );
+}
+
+function ElevatedTransit({ gradientTexture }: { gradientTexture: THREE.DataTexture }) {
+  const route = useMemo(
+    () =>
+      createRouteGeometry([
+        [-56, 5.4, -56],
+        [56, 5.4, -56],
+        [56, 5.4, 56],
+        [-56, 5.4, 56],
+      ]),
+    [],
+  );
+
+  return (
+    <group>
+      <mesh position={[0, 5.3, -56]} castShadow receiveShadow>
+        <boxGeometry args={[116, 0.22, 0.36]} />
+        <meshToonMaterial color="#a7b7c5" gradientMap={gradientTexture} />
+      </mesh>
+      <mesh position={[0, 5.3, 56]} castShadow receiveShadow>
+        <boxGeometry args={[116, 0.22, 0.36]} />
+        <meshToonMaterial color="#a7b7c5" gradientMap={gradientTexture} />
+      </mesh>
+      <mesh position={[-56, 5.3, 0]} castShadow receiveShadow>
+        <boxGeometry args={[0.36, 0.22, 116]} />
+        <meshToonMaterial color="#a7b7c5" gradientMap={gradientTexture} />
+      </mesh>
+      <mesh position={[56, 5.3, 0]} castShadow receiveShadow>
+        <boxGeometry args={[0.36, 0.22, 116]} />
+        <meshToonMaterial color="#a7b7c5" gradientMap={gradientTexture} />
+      </mesh>
+
+      {[-56, -28, 0, 28, 56].map((x) => (
+        <group key={`transit-pillar-${x}`}>
+          <TransitPillar gradientTexture={gradientTexture} position={[x, 2.5, -56]} />
+          <TransitPillar gradientTexture={gradientTexture} position={[x, 2.5, 56]} />
+          {x !== -56 && x !== 56 ? null : (
+            <>
+              <TransitPillar gradientTexture={gradientTexture} position={[x, 2.5, -28]} />
+              <TransitPillar gradientTexture={gradientTexture} position={[x, 2.5, 28]} />
+            </>
+          )}
+        </group>
+      ))}
+
+      <TransitShuttle route={route} gradientTexture={gradientTexture} />
+    </group>
+  );
+}
+
+function TransitPillar({
+  gradientTexture,
+  position,
+}: {
+  gradientTexture: THREE.DataTexture;
+  position: [number, number, number];
+}) {
+  return (
+    <mesh position={position} castShadow receiveShadow>
+      <cylinderGeometry args={[0.2, 0.32, 5, 8]} />
+      <meshToonMaterial color="#cbd5e1" gradientMap={gradientTexture} />
+    </mesh>
+  );
+}
+
+function TransitShuttle({
+  route,
+  gradientTexture,
+}: {
+  route: ReturnType<typeof createRouteGeometry>;
+  gradientTexture: THREE.DataTexture;
+}) {
+  const rootRef = useRef<THREE.Group | null>(null);
+  const sampledPosition = useMemo(() => new THREE.Vector3(), []);
+  const sampledDirection = useMemo(() => new THREE.Vector3(0, 0, 1), []);
+
+  useFrame((state) => {
+    if (!rootRef.current) {
+      return;
+    }
+    sampleRoute(route, state.clock.elapsedTime * 8.5, sampledPosition, sampledDirection);
+    rootRef.current.position.copy(sampledPosition);
+    rootRef.current.rotation.y = Math.atan2(sampledDirection.x, sampledDirection.z);
+  });
+
+  return (
+    <group ref={rootRef}>
+      <mesh castShadow receiveShadow>
+        <boxGeometry args={[5.8, 1.2, 1.3]} />
+        <meshToonMaterial color="#e0f2fe" gradientMap={gradientTexture} />
+      </mesh>
+      <mesh position={[0, 0.16, 0.68]}>
+        <boxGeometry args={[4.4, 0.52, 0.08]} />
+        <meshBasicMaterial color="#38bdf8" transparent opacity={0.78} />
+      </mesh>
+    </group>
+  );
+}
+
+function DistrictGuideLines({ districts }: { districts: WorldDistrict[] }) {
+  return (
+    <>
+      {districts.map((district) => {
+        const distance = Math.sqrt(district.position[0] * district.position[0] + district.position[2] * district.position[2]);
+        const yaw = Math.atan2(district.position[0], district.position[2]);
+        const length = Math.max(8, distance - 13);
+
+        return (
+          <group
+            key={`${district.id}-guide`}
+            position={[district.position[0] * 0.5, 0.115, district.position[2] * 0.5]}
+            rotation-y={yaw}
+          >
+            <mesh rotation-x={-Math.PI / 2}>
+              <planeGeometry args={[1.15, length]} />
+              <meshBasicMaterial color={district.color} transparent opacity={0.14} side={THREE.DoubleSide} />
+            </mesh>
+            <mesh rotation-x={-Math.PI / 2} position={[0, 0.01, length * 0.38]}>
+              <ringGeometry args={[0.7, 0.92, 3]} />
+              <meshBasicMaterial color={district.accent} transparent opacity={0.34} side={THREE.DoubleSide} />
+            </mesh>
+          </group>
+        );
+      })}
+    </>
+  );
+}
+
 function SceneryBand({
   models,
   gradientTexture,
@@ -814,6 +1188,8 @@ function DistrictVenue({
         onClick={() => onSelectDistrict(district.id)}
       />
 
+      <VenueBeacon district={district} focused={focused} open={open} />
+
       {focused ? (
         <InteractionMarker
           position={[0, district.shellSize[1] + 1.8, district.shellSize[2] * 0.24]}
@@ -840,6 +1216,47 @@ function DistrictVenue({
         </button>
       </Html>
     </RigidBody>
+  );
+}
+
+function VenueBeacon({
+  district,
+  focused,
+  open,
+}: {
+  district: WorldDistrict;
+  focused: boolean;
+  open: boolean;
+}) {
+  const beamRef = useRef<THREE.Mesh<THREE.CylinderGeometry, THREE.MeshBasicMaterial> | null>(null);
+  const ringRef = useRef<THREE.Mesh<THREE.TorusGeometry, THREE.MeshBasicMaterial> | null>(null);
+
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
+    if (beamRef.current) {
+      beamRef.current.material.opacity = open ? 0.28 : focused ? 0.22 + Math.sin(t * 3.4) * 0.05 : 0.08;
+    }
+    if (ringRef.current) {
+      ringRef.current.rotation.y = t * 0.5;
+      ringRef.current.scale.setScalar(1 + Math.sin(t * 2.4) * 0.08);
+    }
+  });
+
+  return (
+    <group position={[0, district.shellSize[1] + 0.4, district.shellSize[2] * 0.08]}>
+      <mesh ref={beamRef} position={[0, 3.2, 0]}>
+        <cylinderGeometry args={[0.58, 1.45, 7.2, 24, 1, true]} />
+        <meshBasicMaterial color={district.color} transparent opacity={focused ? 0.22 : 0.08} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+      <mesh ref={ringRef} rotation-x={Math.PI / 2}>
+        <torusGeometry args={[1.7, 0.045, 12, 56]} />
+        <meshBasicMaterial color={district.accent} transparent opacity={open || focused ? 0.84 : 0.36} />
+      </mesh>
+      <mesh position={[0, 0.08, 0]}>
+        <sphereGeometry args={[0.18, 18, 18]} />
+        <meshBasicMaterial color={district.accent} transparent opacity={0.9} />
+      </mesh>
+    </group>
   );
 }
 
@@ -1135,7 +1552,7 @@ function TownNpcWalker({
   speed,
   offset,
   tint,
-  accent: _accent,
+  accent,
   gradientTexture: _gradientTexture,
 }: {
   center: [number, number, number];
@@ -1149,12 +1566,19 @@ function TownNpcWalker({
 }) {
   const { scene, animations } = useGLTF(NPC_MODEL_PATH);
   const clonedScene = useMemo(() => SkeletonUtils.clone(scene) as THREE.Group, [scene]);
-  const fit = useMemo(() => computeObjectFit(clonedScene, [0.9, 1.8, 0.9]), [clonedScene]);
   const rootRef = useRef<THREE.Group | null>(null);
   const { actions } = useAnimations(animations, clonedScene);
   const walkActionRef = useRef<THREE.AnimationAction | null>(null);
 
   useLayoutEffect(() => {
+    recolorNamedMaterials(clonedScene, {
+      Purple: tint,
+      LightBlue: accent,
+      White: "#f8fafc",
+      Skin: "#f2c6a0",
+      Hair: "#3b2f2a",
+    });
+
     clonedScene.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         child.castShadow = true;
@@ -1162,7 +1586,7 @@ function TownNpcWalker({
         child.frustumCulled = false;
       }
     });
-  }, [clonedScene]);
+  }, [accent, clonedScene, tint]);
 
   useEffect(() => {
     const entries = Object.entries(actions ?? {});
@@ -1214,7 +1638,7 @@ function TownNpcWalker({
         <meshBasicMaterial color={tint} transparent opacity={0.14} />
       </mesh>
 
-      <group scale={fit.scale} position={fit.groundedPosition}>
+      <group scale={0.92} position={[0, 0, 0]}>
         <primitive object={clonedScene} />
       </group>
     </group>
@@ -1347,15 +1771,34 @@ function sampleRoute(
 }
 
 function DistrictGlowRings({ districts }: { districts: WorldDistrict[] }) {
+  const nearDistrictId = useSkyportWorldStore((state) => state.nearDistrictId);
+
   return (
     <>
       {districts.map((district) => (
-        <mesh key={district.id} position={[district.position[0], 0.24, district.position[2]]} rotation-x={-Math.PI / 2}>
-          <ringGeometry args={[district.zoneRadius + 0.45, district.zoneRadius + 0.72, 52]} />
-          <meshBasicMaterial color={district.accent} transparent opacity={0.08} side={THREE.DoubleSide} />
-        </mesh>
+        <DistrictGlowRing key={district.id} district={district} focused={nearDistrictId === district.id} />
       ))}
     </>
+  );
+}
+
+function DistrictGlowRing({ district, focused }: { district: WorldDistrict; focused: boolean }) {
+  const ringRef = useRef<THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial> | null>(null);
+
+  useFrame((state) => {
+    if (!ringRef.current) {
+      return;
+    }
+    const t = state.clock.elapsedTime;
+    ringRef.current.material.opacity = focused ? 0.18 + Math.sin(t * 3) * 0.035 : 0.075;
+    ringRef.current.scale.setScalar(focused ? 1.02 + Math.sin(t * 2.5) * 0.025 : 1);
+  });
+
+  return (
+    <mesh ref={ringRef} position={[district.position[0], 0.24, district.position[2]]} rotation-x={-Math.PI / 2}>
+      <ringGeometry args={[district.zoneRadius + 0.45, district.zoneRadius + 0.76, 56]} />
+      <meshBasicMaterial color={district.accent} transparent opacity={0.08} side={THREE.DoubleSide} />
+    </mesh>
   );
 }
 

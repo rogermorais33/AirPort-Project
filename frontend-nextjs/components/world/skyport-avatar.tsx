@@ -6,20 +6,37 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
 
-import { computeObjectFit } from "@/components/world/model-utils";
+import { recolorNamedMaterials } from "@/components/world/model-utils";
 import { useSkyportWorldStore } from "@/components/world/use-skyport-world-store";
 
-const PLAYER_PATH = "/models/kenney-characters/character-e.glb";
-const PLAYER_FIT: [number, number, number] = [0.96, 1.88, 0.96];
+const PLAYER_PATH = "/models/avatar.glb";
+const PLAYER_SCALE = 0.98;
 const PLAYER_YAW_OFFSET = 0;
 
 useGLTF.preload(PLAYER_PATH);
 
+type AvatarMotion = "idle" | "walk" | "run";
+
+interface SkyportAvatarModelProps {
+  gradientTexture: THREE.DataTexture;
+  motion: AvatarMotion;
+  palette?: Record<string, string>;
+  scale?: number;
+}
+
 export function SkyportAvatar({ gradientTexture: _gradientTexture }: { gradientTexture: THREE.DataTexture }) {
   const motion = useSkyportWorldStore((state) => state.playerMotion);
+  return <SkyportAvatarModel gradientTexture={_gradientTexture} motion={motion} />;
+}
+
+export function SkyportAvatarModel({
+  gradientTexture: _gradientTexture,
+  motion,
+  palette,
+  scale = PLAYER_SCALE,
+}: SkyportAvatarModelProps) {
   const { scene, animations } = useGLTF(PLAYER_PATH);
   const clonedScene = useMemo(() => SkeletonUtils.clone(scene) as THREE.Group, [scene]);
-  const fit = useMemo(() => computeObjectFit(clonedScene, PLAYER_FIT), [clonedScene]);
   const rootRef = useRef<THREE.Group | null>(null);
   const { actions } = useAnimations(animations, clonedScene);
   const activeActionRef = useRef<THREE.AnimationAction | null>(null);
@@ -84,6 +101,17 @@ export function SkyportAvatar({ gradientTexture: _gradientTexture }: { gradientT
   }, [actions]);
 
   useLayoutEffect(() => {
+    recolorNamedMaterials(
+      clonedScene,
+      palette ?? {
+        Purple: "#5865f2",
+        LightBlue: "#7dd3fc",
+        White: "#f8fafc",
+        Skin: "#f2c6a0",
+        Hair: "#3b2f2a",
+      },
+    );
+
     clonedScene.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         child.castShadow = true;
@@ -91,7 +119,7 @@ export function SkyportAvatar({ gradientTexture: _gradientTexture }: { gradientT
         child.frustumCulled = false;
       }
     });
-  }, [clonedScene]);
+  }, [clonedScene, palette]);
 
   useEffect(() => {
     if (!hasAnimations) {
@@ -143,7 +171,7 @@ export function SkyportAvatar({ gradientTexture: _gradientTexture }: { gradientT
         <meshBasicMaterial color="#38bdf8" transparent opacity={0.52} side={THREE.DoubleSide} />
       </mesh>
 
-      <group scale={fit.scale} position={fit.groundedPosition} rotation-y={PLAYER_YAW_OFFSET}>
+      <group scale={scale} position={[0, 0, 0]} rotation-y={PLAYER_YAW_OFFSET}>
         <primitive object={clonedScene} />
       </group>
     </group>

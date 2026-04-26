@@ -96,3 +96,27 @@ export function applyToonLook(
     child.userData.gazepilotToonized = true;
   });
 }
+
+export function recolorNamedMaterials(object: THREE.Object3D, palette: Record<string, string>) {
+  object.traverse((child) => {
+    if (!(child instanceof THREE.Mesh) || child.userData.gazepilotRecolored) {
+      return;
+    }
+
+    const sourceMaterials = Array.isArray(child.material) ? child.material : [child.material];
+    const recoloredMaterials = sourceMaterials.map((material) => {
+      const clone = material.clone() as THREE.Material & { color?: THREE.Color };
+      const name = clone.name.toLowerCase();
+      const paletteEntry = Object.entries(palette).find(([key]) => name.includes(key.toLowerCase()));
+
+      if (paletteEntry && clone.color instanceof THREE.Color) {
+        clone.color.set(paletteEntry[1]);
+      }
+
+      return clone;
+    });
+
+    child.material = Array.isArray(child.material) ? recoloredMaterials : recoloredMaterials[0];
+    child.userData.gazepilotRecolored = true;
+  });
+}

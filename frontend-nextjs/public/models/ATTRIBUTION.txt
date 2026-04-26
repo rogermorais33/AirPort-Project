@@ -57,7 +57,7 @@ character-e.glb
 Source: Kenney / Blocky Characters
 URL: https://kenney.nl/assets/blocky-characters
 License: Creative Commons CC0
-Note: This asset is used as the active player avatar and lightweight NPCs in the redesigned /world town scene.
+Note: Legacy blocky character kept in the repository, but no longer used as the active /world player or NPC model.
 
 building-sample-house-a.glb
 building-sample-house-b.glb
@@ -96,9 +96,9 @@ avatar.glb
 Source: Quaternius / Hoodie Character via Poly Pizza
 URL: https://poly.pizza/m/gKLBoRsyKe
 License: CC0
-Note: This asset remains in the repository for possible future use, but is not the active player in the current /world build.
+Note: Active /world player avatar and lightweight NPC model. The GLB includes idle, walk and run animation clips.
 
 Current /world player
-Source: Kenney / Blocky Characters (character-e.glb)
-License: Creative Commons CC0
+Source: Quaternius / Hoodie Character via Poly Pizza (avatar.glb)
+License: CC0
 Note: The active player avatar is integrated with idle/walk/run states and keyboard-first locomotion.
