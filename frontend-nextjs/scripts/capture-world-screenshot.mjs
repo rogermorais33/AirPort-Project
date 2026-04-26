@@ -5,6 +5,17 @@ import { chromium } from "playwright";
 const baseUrl = process.env.WORLD_BASE_URL ?? "http://127.0.0.1:3000";
 const outputPath = process.env.WORLD_SCREENSHOT_PATH ?? "test-results/world/world-redesign.png";
 const movementRecipe = process.env.WORLD_CAPTURE_MOVE ?? "";
+const fullPage = process.env.WORLD_SCREENSHOT_FULLPAGE === "1";
+
+const keyAliases = new Map([
+  ["KeyW", "w"],
+  ["KeyA", "a"],
+  ["KeyS", "s"],
+  ["KeyD", "d"],
+  ["ShiftLeft", "Shift"],
+  ["ShiftRight", "Shift"],
+  ["Space", " "],
+]);
 
 async function run() {
   await fs.mkdir(path.dirname(outputPath), { recursive: true });
@@ -40,7 +51,7 @@ async function run() {
   });
 
   const page = await context.newPage();
-  await page.goto(`${baseUrl}/world`, { waitUntil: "networkidle", timeout: 120_000 });
+  await page.goto(`${baseUrl}/world`, { waitUntil: "domcontentloaded", timeout: 120_000 });
   await page.waitForSelector("canvas", { timeout: 60_000 });
 
   try {
@@ -64,15 +75,16 @@ async function run() {
       if (!move.key) {
         continue;
       }
-      await page.keyboard.down(move.key);
+      const key = keyAliases.get(move.key) ?? move.key;
+      await page.keyboard.down(key);
       await page.waitForTimeout(move.duration);
-      await page.keyboard.up(move.key);
+      await page.keyboard.up(key);
       await page.waitForTimeout(120);
     }
   }
 
-  await page.waitForTimeout(1500);
-  await page.screenshot({ path: outputPath, fullPage: true });
+  await page.waitForTimeout(3000);
+  await page.screenshot({ path: outputPath, fullPage, timeout: 120_000 });
 
   await context.close();
   await browser.close();
