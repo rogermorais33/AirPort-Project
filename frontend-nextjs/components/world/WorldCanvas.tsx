@@ -240,8 +240,8 @@ export function WorldCanvas({
       <Canvas
         className="h-full w-full"
         camera={{ position: [8, 7, 18], fov: 48, near: 0.1, far: 430 }}
-        shadows={{ type: THREE.PCFSoftShadowMap }}
-        gl={{ antialias: true, powerPreference: "high-performance" }}
+        shadows={{ type: THREE.PCFShadowMap }}
+        gl={{ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: true }}
         dpr={[1, 1.65]}
       >
         <Suspense fallback={null}>

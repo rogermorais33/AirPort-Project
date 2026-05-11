@@ -59,4 +59,42 @@ export interface StaticColliderConfig {
   id: string;
   position: Vec3Tuple;
   size: Vec3Tuple;
+  rotationY?: number;
+}
+
+export interface WorldBuildingDefinition {
+  id: string;
+  position: Vec3Tuple;
+  size: Vec3Tuple;
+  color: string;
+  accent?: string;
+  rotationY?: number;
+  modelPath?: string;
+  roof?: "flat" | "beacon" | "garden" | "radar" | "antenna";
+}
+
+export interface WorldPropDefinition {
+  id: string;
+  kind: "cargo" | "terminal" | "gate" | "rock" | "antenna" | "sign" | "platform" | "hangar";
+  position: Vec3Tuple;
+  size: Vec3Tuple;
+  color: string;
+  accent?: string;
+  rotationY?: number;
+  collider?: boolean;
+}
+
+export interface WorldTreeDefinition {
+  id: string;
+  position: Vec3Tuple;
+  scale: number;
+  variant: "pine" | "broadleaf" | "palm";
+  collider?: boolean;
+}
+
+export interface WorldLampDefinition {
+  id: string;
+  position: Vec3Tuple;
+  height?: number;
+  color?: string;
 }

@@ -84,8 +84,8 @@ export function WorldHUD({ trackingMode, motionLatencyMs, openDistrictId }: Worl
               className="absolute h-2.5 w-2.5 rounded-full border border-white/60"
               style={{
                 backgroundColor: district.color,
-                left: `${50 + district.position[0] * 0.62}%`,
-                top: `${50 + district.position[2] * 0.62}%`,
+                left: `${50 + district.position[0] * 0.45}%`,
+                top: `${50 + district.position[2] * 0.45}%`,
                 opacity: district.id === nearDistrictId || district.id === openDistrictId ? 1 : 0.58,
                 transform: "translate(-50%, -50%)",
               }}
@@ -94,8 +94,8 @@ export function WorldHUD({ trackingMode, motionLatencyMs, openDistrictId }: Worl
           <div
             className="absolute h-2 w-2 rounded-full bg-white"
             style={{
-              left: `${50 + playerPosition[0] * 0.62}%`,
-              top: `${50 + playerPosition[2] * 0.62}%`,
+              left: `${50 + playerPosition[0] * 0.45}%`,
+              top: `${50 + playerPosition[2] * 0.45}%`,
               transform: "translate(-50%, -50%)",
             }}
           />

@@ -2,6 +2,8 @@
 
 import { create } from "zustand";
 
+import { INITIAL_PLAYER_HEADING, PLAYER_SPAWN } from "@/components/world/world-config";
+
 interface SkyportWorldState {
   playerPosition: [number, number, number];
   playerHeading: number;
@@ -19,8 +21,8 @@ interface SkyportWorldState {
 }
 
 export const useSkyportWorldStore = create<SkyportWorldState>((set) => ({
-  playerPosition: [0, 1.05, 22],
-  playerHeading: Math.PI,
+  playerPosition: PLAYER_SPAWN,
+  playerHeading: INITIAL_PLAYER_HEADING,
   playerMotion: "idle",
   nearDistrictId: null,
   selectedActionIndex: 1,

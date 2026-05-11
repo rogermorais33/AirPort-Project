@@ -22,13 +22,15 @@ export function ThirdPersonCamera({ cameraRigRef, trackingMode }: ThirdPersonCam
   const desiredCamera = useMemo(() => new THREE.Vector3(8, 7, 18), []);
   const lookAt = useMemo(() => new THREE.Vector3(0, 1.4, 8), []);
   const smoothedLookAt = useMemo(() => new THREE.Vector3(0, 1.4, 8), []);
+  const forward = useMemo(() => new THREE.Vector3(), []);
+  const headingLead = useMemo(() => new THREE.Vector3(), []);
 
   useFrame((_, delta) => {
     const rig = cameraRigRef.current;
     const yaw = rig.yaw;
     const pitch = THREE.MathUtils.clamp(rig.pitch, CAMERA_LIMITS.minPitch, CAMERA_LIMITS.maxPitch);
     const distance = THREE.MathUtils.clamp(rig.distance, CAMERA_LIMITS.minDistance, CAMERA_LIMITS.maxDistance);
-    const forward = new THREE.Vector3(Math.sin(yaw), 0, -Math.cos(yaw));
+    forward.set(Math.sin(yaw), 0, -Math.cos(yaw));
     const horizontalDistance = Math.cos(pitch) * distance;
     const height = 1.8 + Math.sin(pitch) * distance;
 
@@ -44,10 +46,11 @@ export function ThirdPersonCamera({ cameraRigRef, trackingMode }: ThirdPersonCam
       desiredCamera.y = Math.max(desiredCamera.y, 3.2);
 
       const leadDistance = trackingMode === "remote" ? 0.15 : 0.25;
+      headingLead.set(Math.sin(playerHeading), 0, Math.cos(playerHeading));
       lookAt
         .copy(targetPosition)
-        .addScaledVector(new THREE.Vector3(Math.sin(playerHeading), 0, Math.cos(playerHeading)), leadDistance)
-        .add(new THREE.Vector3(0, 0.88, 0));
+        .addScaledVector(headingLead, leadDistance);
+      lookAt.y += 0.88;
 
       camera.position.lerp(desiredCamera, 1 - Math.exp(-delta * cameraLag));
       smoothedLookAt.lerp(lookAt, 1 - Math.exp(-delta * 8.4));
